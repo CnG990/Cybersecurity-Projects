@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  iOS / iPadOS / macOS configuration profile.
+  Forces every DNS query of the device through Cloudflare for Families
+  (1.1.1.3), encrypted with DNS-over-HTTPS, on Wi-Fi and on cellular.
+
+  Install: AirDrop or e-mail the file to the device, then
+  Settings > General > VPN & Device Management > install the profile.
+  Removal is Settings > General > VPN & Device Management > Remove Profile,
+  unless the device is supervised via MDM with removal disallowed.
+-->
+<plist version="1.0">
+<dict>
+    <key>PayloadDisplayName</key>
+    <string>Family DNS (Cloudflare 1.1.1.3)</string>
+    <key>PayloadDescription</key>
+    <string>Encrypted DNS that blocks adult content and malware domains.</string>
+    <key>PayloadIdentifier</key>
+    <string>org.cybersecurity-projects.dns-family-filter</string>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadUUID</key>
+    <string>2E0B4B22-9E5C-4C36-9E1B-5A2E6F0A1C11</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+    <key>PayloadRemovalDisallowed</key>
+    <false/>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>PayloadDisplayName</key>
+            <string>Family DNS settings</string>
+            <key>PayloadIdentifier</key>
+            <string>org.cybersecurity-projects.dns-family-filter.dnssettings</string>
+            <key>PayloadType</key>
+            <string>com.apple.dnsSettings.managed</string>
+            <key>PayloadUUID</key>
+            <string>7C1F8A44-3D62-4A87-B0D9-9C4F2B7E5D22</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>ProhibitDisablement</key>
+            <false/>
+            <key>DNSSettings</key>
+            <dict>
+                <key>DNSProtocol</key>
+                <string>HTTPS</string>
+                <key>ServerURL</key>
+                <string>https://family.cloudflare-dns.com/dns-query</string>
+                <key>ServerAddresses</key>
+                <array>
+                    <string>1.1.1.3</string>
+                    <string>1.0.0.3</string>
+                    <string>2606:4700:4700::1113</string>
+                    <string>2606:4700:4700::1003</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
+</dict>
+</plist>

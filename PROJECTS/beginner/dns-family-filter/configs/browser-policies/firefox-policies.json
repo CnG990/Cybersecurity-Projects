@@ -1,0 +1,12 @@
+{
+  "policies": {
+    "DNSOverHTTPS": {
+      "Enabled": false,
+      "Locked": true
+    },
+    "Proxy": {
+      "Mode": "system",
+      "Locked": true
+    }
+  }
+}
