@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Types PostgreSQL et PostGIS</title>
+<style>
+  :root{
+    --encre:#12355B;      /* bleu de plan */
+    --encre-clair:#E8EEF5;
+    --terrain:#2F6B4F;    /* vert topographique */
+    --terrain-clair:#E6F1EB;
+    --alerte:#B3261E;
+    --alerte-clair:#FBEAE8;
+    --jalon:#8A5A00;      /* ocre de jalon */
+    --jalon-clair:#FFF4D6;
+    --texte:#1B1F24;
+    --gris:#5B6570;
+    --trait:#C9D2DC;
+    --code-fond:#F4F6F8;
+  }
+  *{box-sizing:border-box}
+  html{font-size:16px}
+  body{
+    margin:0; background:#fff; color:var(--texte);
+    font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;
+    line-height:1.6;
+  }
+  .page{max-width:820px; margin:0 auto; padding:24px 28px 80px}
+  h1,h2,h3,h4{font-family:Georgia,"Times New Roman",serif; color:var(--encre); line-height:1.25}
+  h2{font-size:1.75rem; margin:0 0 .6em; padding-bottom:.35em; border-bottom:3px solid var(--encre)}
+  h3{font-size:1.2rem; margin:1.8em 0 .5em}
+  h4{font-size:1rem; margin:1.4em 0 .4em; color:var(--terrain)}
+  p{margin:.6em 0}
+  ul,ol{padding-left:1.4em}
+  li{margin:.25em 0}
+  a{color:var(--encre)}
+  code{font-family:Consolas,"Courier New",monospace; font-size:.9em; background:var(--code-fond); padding:.08em .3em; border-radius:3px}
+  pre{
+    background:var(--code-fond); border:1px solid var(--trait); border-left:4px solid var(--encre);
+    padding:12px 14px; margin:.9em 0; overflow-x:auto; border-radius:0 4px 4px 0;
+    font-family:Consolas,"Courier New",monospace; font-size:.82rem; line-height:1.5;
+    white-space:pre-wrap; word-break:break-word;
+  }
+  pre code{background:none; padding:0; font-size:inherit}
+  pre.shell{border-left-color:var(--terrain)}
+  .c{color:#6B7682; font-style:italic}       /* commentaire */
+  .k{color:#12355B; font-weight:700}          /* mot-clé */
+  .legende{font-size:.82rem; color:var(--gris); margin-top:-.4em}
+
+  /* Couverture */
+  .couverture{
+    min-height:92vh; display:flex; flex-direction:column; justify-content:space-between;
+    border:2px solid var(--encre); padding:40px 36px; margin-bottom:40px; position:relative;
+    background:
+      linear-gradient(var(--encre-clair) 1px, transparent 1px) 0 0/100% 28px,
+      linear-gradient(90deg, var(--encre-clair) 1px, transparent 1px) 0 0/28px 100%;
+  }
+  .couverture .bloc{background:#fff; padding:22px 24px; border:1px solid var(--encre)}
+  .couverture h1{font-size:2.5rem; margin:0 0 .3em}
+  .couverture .sous{font-size:1.15rem; color:var(--gris); margin:0}
+  .cartouche{display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--encre); background:#fff; font-size:.9rem}
+  .cartouche div{padding:8px 12px; border-bottom:1px solid var(--trait)}
+  .cartouche div:nth-child(odd){border-right:1px solid var(--trait)}
+  .cartouche b{display:block; color:var(--encre); font-size:.78rem; font-weight:600}
+
+  /* Chaîne de traitement */
+  .chaine{display:flex; flex-wrap:wrap; gap:6px; margin:1em 0; align-items:stretch}
+  .chaine .etape{flex:1 1 120px; border:1.5px solid var(--encre); padding:8px 10px; font-size:.82rem; background:#fff}
+  .chaine .etape b{display:block; color:var(--encre); font-size:.92rem}
+  .chaine .fl{align-self:center; color:var(--encre); font-weight:700}
+
+  /* Encadrés */
+  .note,.piege,.astuce,.retenir{padding:10px 14px; margin:1em 0; border-left:5px solid; font-size:.94rem}
+  .note{background:var(--encre-clair); border-color:var(--encre)}
+  .piege{background:var(--alerte-clair); border-color:var(--alerte)}
+  .astuce{background:var(--terrain-clair); border-color:var(--terrain)}
+  .retenir{background:var(--jalon-clair); border-color:var(--jalon)}
+  .note>b:first-child,.piege>b:first-child,.astuce>b:first-child,.retenir>b:first-child{display:block; margin-bottom:.2em}
+  .piege>b:first-child{color:var(--alerte)} .astuce>b:first-child{color:var(--terrain)}
+  .retenir>b:first-child{color:var(--jalon)} .note>b:first-child{color:var(--encre)}
+
+  table{border-collapse:collapse; width:100%; margin:1em 0; font-size:.88rem}
+  th,td{border:1px solid var(--trait); padding:6px 9px; text-align:left; vertical-align:top}
+  th{background:var(--encre); color:#fff; font-weight:600}
+  tr:nth-child(even) td{background:#FAFBFC}
+  .tablewrap{overflow-x:auto}
+
+  section.chapitre{margin-top:56px}
+  .num{font-family:Georgia,serif; color:var(--terrain); font-size:.95rem; font-weight:700; display:block; margin-bottom:.2em}
+  .duree{font-size:.85rem; color:var(--gris); margin:-.3em 0 1em}
+
+  .sommaire ol{list-style:none; padding:0; margin:0}
+  .sommaire li{display:flex; gap:10px; padding:6px 0; border-bottom:1px dotted var(--trait)}
+  .sommaire li span:first-child{color:var(--terrain); font-weight:700; min-width:2.2em}
+  .sommaire a{text-decoration:none; color:var(--texte)}
+  .sommaire a:hover{text-decoration:underline}
+
+  .exo{border:1.5px solid var(--terrain); padding:10px 14px; margin:1em 0}
+  .exo>b:first-child{color:var(--terrain)}
+
+  .barre{position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid var(--trait); padding:8px 28px; display:flex; justify-content:space-between; align-items:center; font-size:.88rem; gap:12px}
+  .barre button{background:var(--encre); color:#fff; border:0; padding:8px 14px; font-size:.88rem; cursor:pointer; border-radius:3px}
+  .barre button:focus-visible, a:focus-visible{outline:3px solid var(--jalon); outline-offset:2px}
+
+  /* ----------- Impression / PDF ----------- */
+  @page{size:A4; margin:18mm 16mm 18mm 16mm}
+  @media print{
+    html{font-size:11pt}
+    .barre{display:none}
+    .page{max-width:none; padding:0}
+    .couverture{min-height:250mm; page-break-after:always; margin:0}
+    .sommaire{page-break-after:always}
+    section.chapitre{page-break-before:always; margin-top:0}
+    pre,table,.note,.piege,.astuce,.retenir,.exo,.chaine{page-break-inside:avoid; break-inside:avoid}
+    h2,h3,h4{page-break-after:avoid; break-after:avoid}
+    pre{font-size:8.6pt}
+    a{text-decoration:none; color:inherit}
+    *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  }
+
+  details{margin:.6em 0 .2em}
+  details summary{cursor:pointer; color:var(--terrain); font-weight:600; font-size:.9rem}
+  table.resultat{width:auto; min-width:40%}
+  table.resultat td{font-family:Consolas,"Courier New",monospace; font-size:.82rem}
+  @media (max-width:600px){ .page{padding:16px 16px 60px} .barre{padding:8px 16px} .couverture{padding:20px 16px} .cartouche{grid-template-columns:1fr} .couverture h1{font-size:1.8rem} }
+  @media print{ details summary{display:none} .tablewrap{overflow:visible} }
+</style>
+
+</head>
+<body>
+
+<div class="barre">
+  <span>Module 1 : les types de données PostgreSQL et PostGIS</span>
+  <button onclick="window.print()">Enregistrer en PDF</button>
+</div>
+<div class="page">
+<header class="couverture">
+  <div class="bloc">
+    <h1>Les types de données PostgreSQL et PostGIS</h1>
+    <p class="sous">Module 1 : comprendre ce que contient une table, pas à pas, avant de travailler sur le lotissement de Malicounda Est</p>
+  </div>
+  <div class="cartouche">
+    <div><b>Public</b>Grands débutants en bases de données</div>
+    <div><b>Durée indicative</b>2 séances de 3 heures</div>
+    <div><b>Prérequis</b>Savoir ouvrir pgAdmin</div>
+    <div><b>Logiciels</b>PostgreSQL 18 + PostGIS, pgAdmin 4</div>
+    <div><b>Base de travail</b><code>Malicounda_EST</code></div>
+    <div><b>Formateur</b>Cheikh NGOM</div>
+  </div>
+</header>
+
+<nav class="sommaire" aria-label="Sommaire">
+  <h2>Sommaire</h2>
+  <ol>
+    <li><span>0</span><a href="#e0">Comment travailler dans pgAdmin</a></li>
+    <li><span>1</span><a href="#e1">Les mots de base : table, colonne, ligne, type</a></li>
+    <li><span>2</span><a href="#e2">Les types PostgreSQL : texte, nombre, date, vrai/faux</a></li>
+    <li><span>3</span><a href="#e3">Créer sa première table</a></li>
+    <li><span>4</span><a href="#e4">Activer PostGIS et découvrir les types géométriques</a></li>
+    <li><span>5</span><a href="#e5">Dessiner un lot en SQL</a></li>
+    <li><span>6</span><a href="#e6">Donner une géométrie à sa table</a></li>
+    <li><span>7</span><a href="#e7">Retrouver ces types dans la table de Malicounda Est</a></li>
+    <li><span>8</span><a href="#e8">Premières questions sur Malicounda Est</a></li>
+    <li><span>✓</span><a href="#bilan">Bilan et étape suivante</a></li>
+  </ol>
+</nav>
+<section class="chapitre" id="e0"><span class="num">Étape 0</span><h2>Comment travailler dans pgAdmin</h2><p class="duree">Séance 1 · 15 min</p><div class="retenir"><b>Objectif de l'étape</b><p>Savoir où écrire une instruction SQL et comment l'exécuter.</p></div>
+
+<ol>
+  <li>Dans pgAdmin, déplier <b>Servers &gt; PostgreSQL 18 &gt; Databases</b>.</li>
+  <li>Cliquer sur <b>Malicounda_EST</b>, puis menu <b>Tools &gt; Query Tool</b>.</li>
+  <li>Écrire l'instruction dans la grande zone blanche.</li>
+  <li>Appuyer sur <b>F5</b> (ou le bouton ▶). Le résultat s'affiche en bas, dans <b>Data Output</b>.</li>
+</ol>
+<p>Pour exécuter une seule instruction parmi plusieurs, la <b>sélectionner</b> à la souris avant d'appuyer sur F5.</p>
+<pre><code><span class="k">SELECT</span> 'Bonjour Malicounda';</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>?column?</th></tr><tr><td>Bonjour Malicounda</td></tr></table></div>
+<div class="note"><b>Trois règles d'écriture</b><p>Une instruction se termine par un point-virgule <code>;</code>. Les majuscules aux mots-clés (<code>SELECT</code>) ne sont pas obligatoires, mais facilitent la lecture. Tout ce qui suit <code>--</code> est un commentaire : PostgreSQL l'ignore.</p></div>
+</section><section class="chapitre" id="e1"><span class="num">Étape 1</span><h2>Les mots de base : table, colonne, ligne, type</h2><p class="duree">Séance 1 · 20 min</p><div class="retenir"><b>Objectif de l'étape</b><p>Comprendre comment une base de données range l'information.</p></div>
+<p>Une base de données ressemble à un classeur Excel très strict.</p><div class="tablewrap"><table class="resultat"><tr><th>Excel</th><th>PostgreSQL</th><th>À Malicounda</th></tr><tr><td>le classeur</td><td>la base de données</td><td>Malicounda_EST</td></tr><tr><td>une feuille</td><td>une table</td><td>la table des lots</td></tr><tr><td>une ligne</td><td>une ligne (un enregistrement)</td><td>un lot</td></tr><tr><td>une colonne</td><td>une colonne (un champ)</td><td>le numéro du lot, la superficie…</td></tr><tr><td>le format de cellule</td><td>le type de la colonne</td><td>texte, nombre, géométrie…</td></tr></table></div>
+<p>Voici à quoi ressemblent trois lignes de la table des lots :</p><div class="tablewrap"><table class="resultat"><tr><th>id</th><th>n° du lot</th><th>superficie</th><th>géométrie</th></tr><tr><td>1</td><td>3710</td><td>300</td><td>(forme du lot)</td></tr><tr><td>2</td><td>3709</td><td>300</td><td>(forme du lot)</td></tr><tr><td>3</td><td></td><td>2200</td><td>(forme du lot)</td></tr></table></div>
+<div class="retenir"><b>La grande différence avec Excel</b><p>Dans Excel, on peut taper n'importe quoi dans n'importe quelle cellule. Dans PostgreSQL, <b>chaque colonne a un type</b> fixé à l'avance : une colonne de nombres refuse du texte. C'est ce type que l'on appelle aussi la « variable » de la colonne. Il protège la qualité des données.</p></div>
+</section><section class="chapitre" id="e2"><span class="num">Étape 2</span><h2>Les types PostgreSQL : texte, nombre, date, vrai/faux</h2><p class="duree">Séance 1 · 45 min</p><div class="retenir"><b>Objectif de l'étape</b><p>Connaître les cinq types les plus utiles et savoir les écrire.</p></div>
+<div class="tablewrap"><table class="resultat"><tr><th>Type</th><th>Ce qu&#x27;il contient</th><th>Comment l&#x27;écrire</th><th>Exemple à Malicounda</th></tr><tr><td>INTEGER</td><td>nombre entier</td><td>300</td><td>identifiant d&#x27;un lot : 1, 2, 3…</td></tr><tr><td>NUMERIC</td><td>nombre à virgule</td><td>303.5 (point, pas virgule)</td><td>superficie : 303.5 m²</td></tr><tr><td>VARCHAR / TEXT</td><td>texte</td><td>&#x27;LOT 11 K&#x27; (guillemets simples)</td><td>numéro de lot, nom</td></tr><tr><td>DATE</td><td>date</td><td>&#x27;2014-04-24&#x27; (année-mois-jour)</td><td>date d&#x27;attribution</td></tr><tr><td>BOOLEAN</td><td>vrai ou faux</td><td>TRUE / FALSE</td><td>lot attribué : oui/non</td></tr></table></div>
+<h3>2.1 Essayer chaque type</h3><p>On peut afficher des valeurs sans aucune table :</p><pre><code><span class="k">SELECT</span> 300               <span class="k">AS</span> entier,
+       300.5             <span class="k">AS</span> decimal,
+       'LOT 11 K'        <span class="k">AS</span> texte,
+       DATE '2014-04-24' <span class="k">AS</span> date_attribution,
+       TRUE              <span class="k">AS</span> attribue;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>entier</th><th>decimal</th><th>texte</th><th>date_attribution</th><th>attribue</th></tr><tr><td>300</td><td>300.5</td><td>LOT 11 K</td><td>2014-04-24</td><td>true</td></tr></table></div>
+<p><code>AS</code> donne un nom à la colonne du résultat.</p><h3>2.2 Demander le type à PostgreSQL</h3><pre><code><span class="k">SELECT</span> pg_typeof(300), pg_typeof(300.5), pg_typeof(DATE '2014-04-24'), pg_typeof(TRUE);</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>pg_typeof</th><th>pg_typeof</th><th>pg_typeof</th><th>pg_typeof</th></tr><tr><td>integer</td><td>numeric</td><td>date</td><td>boolean</td></tr></table></div>
+<h3>2.3 Calculer avec les nombres</h3><pre><code><span class="k">SELECT</span> 15 * 20  <span class="k">AS</span> surface_m2,          <span class="c">-- un lot de 15 m sur 20 m</span>
+       7 / 2    <span class="k">AS</span> division_entiere,
+       7.0 / 2  <span class="k">AS</span> division_decimale;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>surface_m2</th><th>division_entiere</th><th>division_decimale</th></tr><tr><td>300</td><td>3</td><td>3.5000</td></tr></table></div>
+<div class="piege"><b>Attention</b><p><code>7 / 2</code> donne <b>3</b> : entre deux entiers, la division est entière. Il suffit d'écrire <code>7.0</code> pour obtenir 3,5.</p></div>
+<h3>2.4 Le type protège : on n'additionne pas du texte</h3><pre><code><span class="k">SELECT</span> 'LOT 3' + 1;      <span class="c">-- ERREUR : invalid input syntax for type integer: "LOT 3"</span></code></pre>
+<div class="note"><b>NULL : l'absence de valeur</b><p><code>NULL</code> veut dire « inconnu » ou « vide ». Ce n'est ni 0, ni un texte vide. Un lot sans numéro a un numéro <code>NULL</code>.</p></div>
+<div class="exo"><b>À vous 1.</b> Afficher en une seule instruction : votre prénom (texte), le nombre 3120 (entier), la date du jour <code>2026-10-05</code> et la valeur FALSE. Puis afficher le type de chacune.<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> 'Awa' <span class="k">AS</span> prenom, 3120 <span class="k">AS</span> nb_lots, DATE '2026-10-05' <span class="k">AS</span> aujourd_hui, FALSE <span class="k">AS</span> termine;
+<span class="k">SELECT</span> pg_typeof('Awa'::text), pg_typeof(3120), pg_typeof(DATE '2026-10-05'), pg_typeof(FALSE);</code></pre>
+</details></div>
+<div class="exo"><b>À vous 2.</b> Calculer la surface en m² d'un lot de 12,5 m sur 24 m, puis convertir 300 m² en hectares (1 ha = 10 000 m²).<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> 12.5 * 24 <span class="k">AS</span> surface_m2;          <span class="c">-- 300.0</span>
+<span class="k">SELECT</span> 300 / 10000.0 <span class="k">AS</span> surface_ha;     <span class="c">-- 0.03 (10000.0 évite la division entière)</span></code></pre>
+</details></div>
+</section><section class="chapitre" id="e3"><span class="num">Étape 3</span><h2>Créer sa première table</h2><p class="duree">Séance 1 · 1 h</p><div class="retenir"><b>Objectif de l'étape</b><p>Créer une petite table avec les types de l'étape 2, la remplir et la lire.</p></div>
+<h3>3.1 Créer la table : CREATE TABLE</h3><p>On décrit chaque colonne par <b>son nom</b> puis <b>son type</b> :</p><pre><code><span class="k">CREATE TABLE</span> mes_lots (
+    id                <span class="k">INTEGER</span>,
+    num_lot           <span class="k">VARCHAR</span>(20),       <span class="c">-- texte de 20 caractères au plus</span>
+    superficie        <span class="k">NUMERIC</span>(10,2),     <span class="c">-- 10 chiffres dont 2 après la virgule</span>
+    date_attribution  DATE,
+    attribue          BOOLEAN
+);</code></pre>
+<p>La table apparaît dans pgAdmin sous <b>Schemas &gt; public &gt; Tables</b> (clic droit &gt; <i>Refresh</i> si besoin). Elle est vide.</p><div class="note"><b>Bien nommer</b><p>Pour nos propres tables et colonnes : minuscules, sans accent, sans espace, mots reliés par <code>_</code>. Exemple : <code>date_attribution</code>, et non <code>Date d'attribution</code>.</p></div>
+<h3>3.2 Ajouter des lignes : INSERT INTO</h3><pre><code><span class="k">INSERT INTO</span> mes_lots <span class="k">VALUES</span>
+    (1, '3710',     300,   '2014-04-24', TRUE),
+    (2, '3709',     300,   <span class="k">NULL</span>,         FALSE),   <span class="c">-- date inconnue</span>
+    (3, 'LOT 11 K', 303.5, '2017-06-14', TRUE);</code></pre>
+<p>Les valeurs sont données dans l'ordre des colonnes. Le message <code>INSERT 0 3</code> confirme que 3 lignes ont été ajoutées.</p><h3>3.3 Lire la table : SELECT</h3><pre><code><span class="k">SELECT</span> * <span class="k">FROM</span> mes_lots;        <span class="c">-- * = toutes les colonnes</span></code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>id</th><th>num_lot</th><th>superficie</th><th>date_attribution</th><th>attribue</th></tr><tr><td>1</td><td>3710</td><td>300.00</td><td>2014-04-24</td><td>true</td></tr><tr><td>2</td><td>3709</td><td>300.00</td><td>[null]</td><td>false</td></tr><tr><td>3</td><td>LOT 11 K</td><td>303.50</td><td>2017-06-14</td><td>true</td></tr></table></div>
+<p>Remarquer : 300 est devenu <code>300.00</code> car la colonne garde toujours 2 décimales.</p><h3>3.4 La table refuse les mauvaises valeurs</h3><pre><code><span class="k">INSERT INTO</span> mes_lots <span class="k">VALUES</span> (4, '3708', 'trois cents', <span class="k">NULL</span>, FALSE);
+<span class="c">-- ERREUR : invalid input syntax for type numeric: "trois cents"</span>
+
+<span class="k">INSERT INTO</span> mes_lots <span class="k">VALUES</span> (4, '3708', 300, '24/04/2014', FALSE);
+<span class="c">-- ERREUR : date/time field value out of range: "24/04/2014"</span></code></pre>
+<div class="retenir"><b>À retenir</b><p>C'est exactement ce que l'on veut : grâce aux types, aucune superficie écrite en lettres ni aucune date mal formée ne peut entrer dans la base. Les dates s'écrivent <code>'AAAA-MM-JJ'</code>.</p></div>
+<div class="exo"><b>À vous 3.</b> Ajouter à <code>mes_lots</code> le lot n° <code>4518BIS</code> (id 4), de 296 m², attribué le 5 août 2015. Puis afficher la table.<details><summary>Voir la réponse</summary><pre><code><span class="k">INSERT INTO</span> mes_lots <span class="k">VALUES</span> (4, '4518BIS', 296, '2015-08-05', TRUE);
+<span class="k">SELECT</span> * <span class="k">FROM</span> mes_lots;</code></pre>
+</details></div>
+<div class="exo"><b>À vous 4.</b> Afficher seulement le numéro et la superficie des lots attribués.<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> num_lot, superficie
+<span class="k">FROM</span> mes_lots
+<span class="k">WHERE</span> attribue = TRUE;</code></pre>
+</details></div>
+</section><section class="chapitre" id="e4"><span class="num">Étape 4</span><h2>Activer PostGIS et découvrir les types géométriques</h2><p class="duree">Séance 2 · 45 min</p><div class="retenir"><b>Objectif de l'étape</b><p>Ajouter à PostgreSQL le type « géométrie » et connaître ses formes.</p></div>
+<h3>4.1 Activer PostGIS (une seule fois)</h3><p>PostgreSQL ne connaît pas les cartes. PostGIS est une <b>extension</b> qui lui apprend le type <code>geometry</code>. On l'active une fois dans la base :</p><pre><code><span class="k">CREATE EXTENSION</span> <span class="k">IF NOT EXISTS</span> postgis;
+<span class="k">SELECT</span> PostGIS_Version();          <span class="c">-- vérifie : affiche 3.x</span></code></pre>
+<h3>4.2 Les quatre formes à connaître</h3><div class="tablewrap"><table class="resultat"><tr><th>Type géométrique</th><th>Forme</th><th>À Malicounda</th></tr><tr><td>POINT</td><td>un point</td><td>une borne, le centre d&#x27;un lot</td></tr><tr><td>LINESTRING</td><td>une ligne</td><td>l&#x27;axe d&#x27;une rue</td></tr><tr><td>POLYGON</td><td>une surface fermée</td><td>un lot</td></tr><tr><td>MULTIPOLYGON</td><td>une ou plusieurs surfaces</td><td>les lots dans la table livrée par QGIS</td></tr></table></div>
+<h3>4.3 Le SRID : dans quel système sont les coordonnées ?</h3><div class="tablewrap"><table class="resultat"><tr><th>SRID</th><th>Nom</th><th>Unité</th><th>Exemple de coordonnées à Malicounda</th></tr><tr><td>32628</td><td>WGS 84 / UTM zone 28 Nord</td><td>mètres</td><td>X = 288 945   Y = 1 598 255</td></tr><tr><td>4326</td><td>WGS 84 (GPS)</td><td>degrés</td><td>longitude -16.9579   latitude 14.4487</td></tr></table></div>
+<p>Une géométrie PostGIS, c'est donc toujours <b>une forme + des coordonnées + un SRID</b>. Les plans de Malicounda sont en <b>32628</b> : les mesures sont directement en mètres.</p><h3>4.4 Écrire une géométrie en texte (WKT)</h3><p>On écrit le nom de la forme, puis les coordonnées X Y entre parenthèses :</p><pre><code><span class="k">SELECT</span> ST_AsText( ST_GeomFromText('POINT(288945 1598255)', 32628) );</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>st_astext</th></tr><tr><td>POINT(288945 1598255)</td></tr></table></div>
+<p><code>ST_GeomFromText(texte, srid)</code> fabrique une géométrie. <code>ST_AsText</code> la réaffiche en texte lisible. Toutes les fonctions PostGIS commencent par <code>ST_</code>.</p><pre><code><span class="k">SELECT</span> GeometryType( ST_GeomFromText('LINESTRING(288900 1598240, 289000 1598240)', 32628) ) <span class="k">AS</span> forme,
+       ST_Length(    ST_GeomFromText('LINESTRING(288900 1598240, 289000 1598240)', 32628) ) <span class="k">AS</span> longueur_m;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>forme</th><th>longueur_m</th></tr><tr><td>LINESTRING</td><td>100</td></tr></table></div>
+<div class="exo"><b>À vous 5.</b> Afficher le SRID du point <code>POINT(288945 1598255)</code> en 32628 avec la fonction <code>ST_SRID</code>.<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> ST_SRID( ST_GeomFromText('POINT(288945 1598255)', 32628) );   <span class="c">-- 32628</span></code></pre>
+</details></div>
+</section><section class="chapitre" id="e5"><span class="num">Étape 5</span><h2>Dessiner un lot en SQL</h2><p class="duree">Séance 2 · 30 min</p><div class="retenir"><b>Objectif de l'étape</b><p>Créer un polygone à la main, le mesurer et le situer sur la carte.</p></div>
+<p>Un lot standard de Malicounda fait 15 m sur 20 m. On donne les 4 coins, et on <b>répète le premier point à la fin</b> pour fermer le polygone :</p><pre><code><span class="k">SELECT</span> ST_Area(     ST_GeomFromText('POLYGON((288940 1598250, 288955 1598250, 288955 1598270, 288940 1598270, 288940 1598250))', 32628) ) <span class="k">AS</span> surface_m2,
+       ST_Perimeter(ST_GeomFromText('POLYGON((288940 1598250, 288955 1598250, 288955 1598270, 288940 1598270, 288940 1598250))', 32628) ) <span class="k">AS</span> perimetre_m;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>surface_m2</th><th>perimetre_m</th></tr><tr><td>300</td><td>70</td></tr></table></div>
+<p>15 × 20 = 300 m² et 2 × (15 + 20) = 70 m : PostGIS calcule en mètres parce que le SRID 32628 est en mètres.</p><h3>5.1 Où est ce lot ? Passer en coordonnées GPS</h3><pre><code><span class="k">SELECT</span> ST_AsText( ST_Transform( ST_GeomFromText('POINT(288945 1598255)', 32628), 4326) );</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>st_astext</th></tr><tr><td>POINT(-16.957903 14.448734)</td></tr></table></div>
+<p><code>ST_Transform</code> convertit les coordonnées d'un système à l'autre. Coller <code>14.448734, -16.957903</code> dans Google Maps : on est à Malicounda Est. Ce point se trouve justement dans le lot réel n° 3710, qui fait lui aussi 300 m² (étape 8).</p><div class="astuce"><b>Voir la forme dans pgAdmin</b><p>Exécuter <code>SELECT ST_GeomFromText('…', 32628);</code> (sans <code>ST_AsText</code>), puis cliquer sur l'icône en forme d'œil dans l'en-tête de la colonne du résultat : le <b>Geometry Viewer</b> dessine le lot.</p></div>
+<div class="exo"><b>À vous 6.</b> Dessiner un lot de 10 m sur 30 m dont le coin bas-gauche est en (288940, 1598250), et calculer sa surface et son périmètre.<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> ST_Area(     ST_GeomFromText('POLYGON((288940 1598250, 288950 1598250, 288950 1598280, 288940 1598280, 288940 1598250))', 32628)) <span class="k">AS</span> surface_m2,
+       ST_Perimeter(ST_GeomFromText('POLYGON((288940 1598250, 288950 1598250, 288950 1598280, 288940 1598280, 288940 1598250))', 32628)) <span class="k">AS</span> perimetre_m;
+<span class="c">-- 300 m² et 80 m : même surface, forme différente</span></code></pre>
+</details></div>
+</section><section class="chapitre" id="e6"><span class="num">Étape 6</span><h2>Donner une géométrie à sa table</h2><p class="duree">Séance 2 · 30 min</p><div class="retenir"><b>Objectif de l'étape</b><p>Ajouter une colonne géométrique à <code>mes_lots</code> et comprendre qu'elle a, elle aussi, un type strict.</p></div>
+<h3>6.1 Ajouter la colonne</h3><pre><code><span class="k">ALTER TABLE</span> mes_lots <span class="k">ADD COLUMN</span> geom geometry(Polygon, 32628);</code></pre>
+<p>Le type <code>geometry(Polygon, 32628)</code> veut dire : « uniquement des polygones, uniquement en UTM 28 Nord ».</p><h3>6.2 Remplir la géométrie d'un lot : UPDATE</h3><pre><code><span class="k">UPDATE</span> mes_lots
+<span class="k">SET</span> geom = ST_GeomFromText('POLYGON((288940 1598250, 288955 1598250, 288955 1598270, 288940 1598270, 288940 1598250))', 32628)
+<span class="k">WHERE</span> id = 1;                       <span class="c">-- seulement le lot 1</span>
+
+<span class="k">SELECT</span> id, num_lot, ST_Area(geom) <span class="k">AS</span> surface_m2 <span class="k">FROM</span> mes_lots;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>id</th><th>num_lot</th><th>surface_m2</th></tr><tr><td>1</td><td>3710</td><td>300</td></tr><tr><td>2</td><td>3709</td><td>[null]</td></tr><tr><td>3</td><td>LOT 11 K</td><td>[null]</td></tr></table></div>
+<div class="piege"><b>Ne jamais oublier le WHERE</b><p>Sans <code>WHERE id = 1</code>, <b>tous</b> les lots recevraient la même forme.</p></div>
+<h3>6.3 La colonne refuse les mauvaises géométries</h3><pre><code><span class="k">UPDATE</span> mes_lots <span class="k">SET</span> geom = ST_GeomFromText('POINT(288945 1598255)', 32628) <span class="k">WHERE</span> id = 2;
+<span class="c">-- ERREUR : Geometry type (Point) does not match column type (Polygon)</span>
+
+<span class="k">UPDATE</span> mes_lots <span class="k">SET</span> geom = ST_GeomFromText('POLYGON((288940 1598250, 288955 1598250, 288955 1598270, 288940 1598270, 288940 1598250))', 4326) <span class="k">WHERE</span> id = 2;
+<span class="c">-- ERREUR : Geometry SRID (4326) does not match column SRID (32628)</span></code></pre>
+<p>Comme à l'étape 3 pour les nombres et les dates : la forme et le SRID font partie du type, et PostGIS refuse tout ce qui ne correspond pas.</p><div class="exo"><b>À vous 7.</b> Donner au lot 2 (<code>3709</code>) le polygone de l'exercice « À vous 6 », puis afficher la surface de tous les lots.<details><summary>Voir la réponse</summary><pre><code><span class="k">UPDATE</span> mes_lots
+<span class="k">SET</span> geom = ST_GeomFromText('POLYGON((288940 1598250, 288950 1598250, 288950 1598280, 288940 1598280, 288940 1598250))', 32628)
+<span class="k">WHERE</span> id = 2;
+
+<span class="k">SELECT</span> id, num_lot, ST_Area(geom) <span class="k">AS</span> surface_m2 <span class="k">FROM</span> mes_lots;</code></pre>
+</details></div>
+</section><section class="chapitre" id="e7"><span class="num">Étape 7</span><h2>Retrouver ces types dans la table de Malicounda Est</h2><p class="duree">Séance 2 · 30 min</p><div class="retenir"><b>Objectif de l'étape</b><p>Ouvrir la vraie table et reconnaître le type de chacune de ses colonnes.</p></div>
+<div class="note"><b>Si la table n'est pas encore importée</b><p>PostGIS étant maintenant activé (étape 4), ouvrir le fichier <code>Malicouda_EST.sql</code> dans le Query Tool (icône dossier), puis F5. La table <code>malicouda est</code> apparaît dans <b>Schemas &gt; public &gt; Tables</b>.</p></div>
+<h3>7.1 Les guillemets doubles</h3><p>Le nom de cette table et de certaines colonnes contient des espaces ou le signe « ° ». Il faut alors les écrire <b>entre guillemets doubles</b>.</p><div class="tablewrap"><table class="resultat"><tr><th>Guillemets</th><th>Servent à écrire</th><th>Exemple</th></tr><tr><td>doubles &quot; &quot;</td><td>un nom de table ou de colonne</td><td>&quot;malicouda est&quot;, &quot;n° du lot&quot;</td></tr><tr><td>simples &#x27; &#x27;</td><td>une valeur de texte</td><td>&#x27;3710&#x27;</td></tr></table></div>
+<pre><code><span class="k">SELECT</span> n° du lot <span class="k">FROM</span> "malicouda est";       <span class="c">-- ERREUR : syntax error</span>
+<span class="k">SELECT</span> "n° du lot" <span class="k">FROM</span> "malicouda est";     <span class="c">-- correct</span></code></pre>
+<h3>7.2 Le type de chaque colonne</h3><pre><code><span class="k">SELECT</span> pg_typeof(ogc_fid)      <span class="k">AS</span> type_id,
+       pg_typeof("n° du lot")  <span class="k">AS</span> type_numero,
+       pg_typeof(superficie)   <span class="k">AS</span> type_superficie,
+       pg_typeof(wkb_geometry) <span class="k">AS</span> type_geometrie
+<span class="k">FROM</span> "malicouda est"
+<span class="k">LIMIT</span> 1;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>type_id</th><th>type_numero</th><th>type_superficie</th><th>type_geometrie</th></tr><tr><td>integer</td><td>character varying</td><td>numeric</td><td>geometry</td></tr></table></div>
+<div class="tablewrap"><table class="resultat"><tr><th>Colonne</th><th>Type</th><th>Pourquoi ce type</th></tr><tr><td>ogc_fid</td><td>INTEGER</td><td>numéro automatique de chaque ligne</td></tr><tr><td>n° du lot</td><td>VARCHAR</td><td>texte, car certains numéros contiennent des lettres : LOT 11 K, 4518BIS</td></tr><tr><td>commune, village, prenom, nom…</td><td>VARCHAR</td><td>texte</td></tr><tr><td>superficie</td><td>NUMERIC</td><td>nombre, pour pouvoir calculer</td></tr><tr><td>wkb_geometry</td><td>geometry(MultiPolygon Z, 32628)</td><td>la forme du lot en UTM 28 Nord</td></tr></table></div>
+<h3>7.3 Regarder la géométrie</h3><pre><code><span class="k">SELECT</span> "n° du lot", superficie,
+       GeometryType(wkb_geometry) <span class="k">AS</span> forme,
+       ST_SRID(wkb_geometry)      <span class="k">AS</span> srid
+<span class="k">FROM</span> "malicouda est"
+<span class="k">LIMIT</span> 5;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>n° du lot</th><th>superficie</th><th>forme</th><th>srid</th></tr><tr><td>3710</td><td>300</td><td>MULTIPOLYGON</td><td>32628</td></tr><tr><td>3709</td><td>300</td><td>MULTIPOLYGON</td><td>32628</td></tr><tr><td>[null]</td><td>2200</td><td>MULTIPOLYGON</td><td>32628</td></tr><tr><td>[null]</td><td>990</td><td>MULTIPOLYGON</td><td>32628</td></tr><tr><td>[null]</td><td>990</td><td>MULTIPOLYGON</td><td>32628</td></tr></table></div>
+<div class="note"><b>Et le « Z » ?</b><p>QGIS a ajouté une troisième coordonnée, l'altitude Z, qui vaut toujours 0. On peut l'ignorer pour l'instant.</p></div>
+</section><section class="chapitre" id="e8"><span class="num">Étape 8</span><h2>Premières questions sur Malicounda Est</h2><p class="duree">Séance 2 · 45 min</p><div class="retenir"><b>Objectif de l'étape</b><p>Utiliser ce que l'on sait déjà (SELECT, WHERE, ST_Area) sur les vrais lots.</p></div>
+<h3>8.1 Compter</h3><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est";                         <span class="c">-- combien de lots ?</span>
+<span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> superficie = 300;  <span class="c">-- combien de lots de 300 m² ?</span></code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>Question</th><th>Réponse</th></tr><tr><td>Nombre total de lots</td><td>3120</td></tr><tr><td>Lots de 300 m²</td><td>1311</td></tr></table></div>
+<h3>8.2 Retrouver un lot par son numéro</h3><pre><code><span class="k">SELECT</span> ogc_fid, "n° du lot", superficie
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> "n° du lot" = '3710';        <span class="c">-- numéro = texte, donc guillemets simples</span></code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>ogc_fid</th><th>n° du lot</th><th>superficie</th></tr><tr><td>1</td><td>3710</td><td>300</td></tr></table></div>
+<h3>8.3 Mesurer le vrai lot</h3><pre><code><span class="k">SELECT</span> "n° du lot",
+       superficie,
+       ROUND(ST_Area(wkb_geometry))      <span class="k">AS</span> surface_calculee,
+       ROUND(ST_Perimeter(wkb_geometry)) <span class="k">AS</span> perimetre
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> "n° du lot" = '3710';</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>n° du lot</th><th>superficie</th><th>surface_calculee</th><th>perimetre</th></tr><tr><td>3710</td><td>300</td><td>300</td><td>70</td></tr></table></div>
+<p>Mêmes résultats que le lot dessiné à la main à l'étape 5 : le lot 3710 est bien un lot standard de 15 m × 20 m. La colonne <code>superficie</code> (saisie) et <code>ST_Area</code> (calculée sur la forme) concordent.</p><div class="exo"><b>À vous 8.</b> Combien de lots font plus de 1 000 m² ?<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> superficie &gt; 1000;   <span class="c">-- 31</span></code></pre>
+</details></div>
+<div class="exo"><b>À vous 9.</b> Combien de lots n'ont pas de numéro ? (indice : on ne teste pas NULL avec <code>=</code> mais avec <code>IS NULL</code>)<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" <span class="k">IS</span> <span class="k">NULL</span>;   <span class="c">-- 257</span></code></pre>
+</details></div>
+<div class="exo"><b>À vous 10.</b> Afficher la forme du lot 3709 en texte lisible.<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> ST_AsText(wkb_geometry) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" = '3709';
+<span class="c">-- MULTIPOLYGON Z (((288936.73 1598263.94 0, ...)))</span></code></pre>
+</details></div>
+</section><section class="chapitre" id="bilan"><span class="num">Bilan</span><h2>Ce que vous savez maintenant</h2><div class="tablewrap"><table class="resultat"><tr><th>Notion</th><th>À retenir</th></tr><tr><td>Table, colonne, ligne</td><td>une table = des lignes (les lots) et des colonnes (leurs informations)</td></tr><tr><td>Types PostgreSQL</td><td>INTEGER, NUMERIC, VARCHAR, DATE, BOOLEAN ; NULL = absence de valeur</td></tr><tr><td>Types PostGIS</td><td>POINT, LINESTRING, POLYGON, MULTIPOLYGON + un SRID</td></tr><tr><td>SRID</td><td>32628 = UTM 28 N en mètres (plans) ; 4326 = GPS en degrés</td></tr><tr><td>Guillemets</td><td>&#x27;valeur&#x27;  et  &quot;nom de colonne&quot;</td></tr><tr><td>Instructions vues</td><td>SELECT, CREATE TABLE, INSERT INTO, ALTER TABLE, UPDATE … WHERE</td></tr><tr><td>Fonctions vues</td><td>pg_typeof, ST_GeomFromText, ST_AsText, ST_Area, ST_Perimeter, ST_Length, ST_SRID, ST_Transform</td></tr></table></div>
+<h3>Étape suivante (Module 2)</h3><p>Lire et résumer la table de Malicounda Est : choisir des colonnes, filtrer avec plusieurs conditions, trier, compter et regrouper (<code>ORDER BY</code>, <code>GROUP BY</code>).</p><p>Pour terminer, on peut supprimer la table d'entraînement : <code>DROP TABLE mes_lots;</code></p></section>
+</div>
+<script>window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));</script>
+</body>
+</html>
