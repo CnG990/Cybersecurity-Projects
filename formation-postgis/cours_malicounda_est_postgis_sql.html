@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Malicounda Est : PostGIS et SQL</title>
+<style>
+  :root{
+    --encre:#12355B;      /* bleu de plan */
+    --encre-clair:#E8EEF5;
+    --terrain:#2F6B4F;    /* vert topographique */
+    --terrain-clair:#E6F1EB;
+    --alerte:#B3261E;
+    --alerte-clair:#FBEAE8;
+    --jalon:#8A5A00;      /* ocre de jalon */
+    --jalon-clair:#FFF4D6;
+    --texte:#1B1F24;
+    --gris:#5B6570;
+    --trait:#C9D2DC;
+    --code-fond:#F4F6F8;
+  }
+  *{box-sizing:border-box}
+  html{font-size:16px}
+  body{
+    margin:0; background:#fff; color:var(--texte);
+    font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;
+    line-height:1.6;
+  }
+  .page{max-width:820px; margin:0 auto; padding:24px 28px 80px}
+  h1,h2,h3,h4{font-family:Georgia,"Times New Roman",serif; color:var(--encre); line-height:1.25}
+  h2{font-size:1.75rem; margin:0 0 .6em; padding-bottom:.35em; border-bottom:3px solid var(--encre)}
+  h3{font-size:1.2rem; margin:1.8em 0 .5em}
+  h4{font-size:1rem; margin:1.4em 0 .4em; color:var(--terrain)}
+  p{margin:.6em 0}
+  ul,ol{padding-left:1.4em}
+  li{margin:.25em 0}
+  a{color:var(--encre)}
+  code{font-family:Consolas,"Courier New",monospace; font-size:.9em; background:var(--code-fond); padding:.08em .3em; border-radius:3px}
+  pre{
+    background:var(--code-fond); border:1px solid var(--trait); border-left:4px solid var(--encre);
+    padding:12px 14px; margin:.9em 0; overflow-x:auto; border-radius:0 4px 4px 0;
+    font-family:Consolas,"Courier New",monospace; font-size:.82rem; line-height:1.5;
+    white-space:pre-wrap; word-break:break-word;
+  }
+  pre code{background:none; padding:0; font-size:inherit}
+  pre.shell{border-left-color:var(--terrain)}
+  .c{color:#6B7682; font-style:italic}       /* commentaire */
+  .k{color:#12355B; font-weight:700}          /* mot-clé */
+  .legende{font-size:.82rem; color:var(--gris); margin-top:-.4em}
+
+  /* Couverture */
+  .couverture{
+    min-height:92vh; display:flex; flex-direction:column; justify-content:space-between;
+    border:2px solid var(--encre); padding:40px 36px; margin-bottom:40px; position:relative;
+    background:
+      linear-gradient(var(--encre-clair) 1px, transparent 1px) 0 0/100% 28px,
+      linear-gradient(90deg, var(--encre-clair) 1px, transparent 1px) 0 0/28px 100%;
+  }
+  .couverture .bloc{background:#fff; padding:22px 24px; border:1px solid var(--encre)}
+  .couverture h1{font-size:2.5rem; margin:0 0 .3em}
+  .couverture .sous{font-size:1.15rem; color:var(--gris); margin:0}
+  .cartouche{display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--encre); background:#fff; font-size:.9rem}
+  .cartouche div{padding:8px 12px; border-bottom:1px solid var(--trait)}
+  .cartouche div:nth-child(odd){border-right:1px solid var(--trait)}
+  .cartouche b{display:block; color:var(--encre); font-size:.78rem; font-weight:600}
+
+  /* Chaîne de traitement */
+  .chaine{display:flex; flex-wrap:wrap; gap:6px; margin:1em 0; align-items:stretch}
+  .chaine .etape{flex:1 1 120px; border:1.5px solid var(--encre); padding:8px 10px; font-size:.82rem; background:#fff}
+  .chaine .etape b{display:block; color:var(--encre); font-size:.92rem}
+  .chaine .fl{align-self:center; color:var(--encre); font-weight:700}
+
+  /* Encadrés */
+  .note,.piege,.astuce,.retenir{padding:10px 14px; margin:1em 0; border-left:5px solid; font-size:.94rem}
+  .note{background:var(--encre-clair); border-color:var(--encre)}
+  .piege{background:var(--alerte-clair); border-color:var(--alerte)}
+  .astuce{background:var(--terrain-clair); border-color:var(--terrain)}
+  .retenir{background:var(--jalon-clair); border-color:var(--jalon)}
+  .note>b:first-child,.piege>b:first-child,.astuce>b:first-child,.retenir>b:first-child{display:block; margin-bottom:.2em}
+  .piege>b:first-child{color:var(--alerte)} .astuce>b:first-child{color:var(--terrain)}
+  .retenir>b:first-child{color:var(--jalon)} .note>b:first-child{color:var(--encre)}
+
+  table{border-collapse:collapse; width:100%; margin:1em 0; font-size:.88rem}
+  th,td{border:1px solid var(--trait); padding:6px 9px; text-align:left; vertical-align:top}
+  th{background:var(--encre); color:#fff; font-weight:600}
+  tr:nth-child(even) td{background:#FAFBFC}
+  .tablewrap{overflow-x:auto}
+
+  section.chapitre{margin-top:56px}
+  .num{font-family:Georgia,serif; color:var(--terrain); font-size:.95rem; font-weight:700; display:block; margin-bottom:.2em}
+  .duree{font-size:.85rem; color:var(--gris); margin:-.3em 0 1em}
+
+  .sommaire ol{list-style:none; padding:0; margin:0}
+  .sommaire li{display:flex; gap:10px; padding:6px 0; border-bottom:1px dotted var(--trait)}
+  .sommaire li span:first-child{color:var(--terrain); font-weight:700; min-width:2.2em}
+  .sommaire a{text-decoration:none; color:var(--texte)}
+  .sommaire a:hover{text-decoration:underline}
+
+  .exo{border:1.5px solid var(--terrain); padding:10px 14px; margin:1em 0}
+  .exo>b:first-child{color:var(--terrain)}
+
+  .barre{position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid var(--trait); padding:8px 28px; display:flex; justify-content:space-between; align-items:center; font-size:.88rem; gap:12px}
+  .barre button{background:var(--encre); color:#fff; border:0; padding:8px 14px; font-size:.88rem; cursor:pointer; border-radius:3px}
+  .barre button:focus-visible, a:focus-visible{outline:3px solid var(--jalon); outline-offset:2px}
+
+  /* ----------- Impression / PDF ----------- */
+  @page{size:A4; margin:18mm 16mm 18mm 16mm}
+  @media print{
+    html{font-size:11pt}
+    .barre{display:none}
+    .page{max-width:none; padding:0}
+    .couverture{min-height:250mm; page-break-after:always; margin:0}
+    .sommaire{page-break-after:always}
+    section.chapitre{page-break-before:always; margin-top:0}
+    pre,table,.note,.piege,.astuce,.retenir,.exo,.chaine{page-break-inside:avoid; break-inside:avoid}
+    h2,h3,h4{page-break-after:avoid; break-after:avoid}
+    pre{font-size:8.6pt}
+    a{text-decoration:none; color:inherit}
+    *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  }
+
+  details{margin:.6em 0 .2em}
+  details summary{cursor:pointer; color:var(--terrain); font-weight:600; font-size:.9rem}
+  table.resultat{width:auto; min-width:40%}
+  table.resultat td{font-family:Consolas,"Courier New",monospace; font-size:.82rem}
+  @media (max-width:600px){ .page{padding:16px 16px 60px} .barre{padding:8px 16px} .couverture{padding:20px 16px} .cartouche{grid-template-columns:1fr} .couverture h1{font-size:1.8rem} }
+  @media print{ details summary{display:none} .tablewrap{overflow:visible} }
+</style>
+
+</head>
+<body>
+
+<div class="barre">
+  <span>Partie 2 : Malicounda Est dans PostgreSQL/PostGIS</span>
+  <button onclick="window.print()">Enregistrer en PDF</button>
+</div>
+<div class="page">
+<header class="couverture">
+  <div class="bloc">
+    <h1>Malicounda Est dans PostgreSQL/PostGIS</h1>
+    <p class="sous">Partie 2 : intégrer le plan de lotissement dans la base <code>Malicounda_EST</code>, le structurer et apprendre le SQL pas à pas</p>
+  </div>
+  <div class="cartouche">
+    <div><b>Public</b>Débutants en bases de données spatiales</div>
+    <div><b>Durée indicative</b>4 séances de 3 heures</div>
+    <div><b>Prérequis</b>Partie 1 : DWG nettoyé dans QGIS, jointure du fichier Excel des propriétaires</div>
+    <div><b>Logiciels</b>PostgreSQL 18 + PostGIS, pgAdmin 4, QGIS</div>
+    <div><b>Jeu de données</b><code>Malicouda_EST.sql</code> : dump QGIS, 3 120 lots, EPSG:32628</div>
+    <div><b>Formateur</b>Cheikh NGOM</div>
+  </div>
+</header>
+
+<nav class="sommaire" aria-label="Sommaire">
+  <h2>Sommaire</h2>
+  <ol>
+    <li><span>0</span><a href="#c0">Point de départ et objectifs</a></li>
+    <li><span>1</span><a href="#c1">Préparer la base Malicounda_EST</a></li>
+    <li><span>2</span><a href="#c2">Importer le dump SQL produit par QGIS</a></li>
+    <li><span>3</span><a href="#c3">Découvrir la table importée</a></li>
+    <li><span>4</span><a href="#c4">Créer la table de travail cad.parcelles</a></li>
+    <li><span>5</span><a href="#c5">Les bases du SQL : lire et résumer</a></li>
+    <li><span>6</span><a href="#c6">Modifier les données en sécurité</a></li>
+    <li><span>7</span><a href="#c7">Plusieurs tables : clés et jointures</a></li>
+    <li><span>8</span><a href="#c8">Les requêtes spatiales</a></li>
+    <li><span>9</span><a href="#c9">Contrôle qualité</a></li>
+    <li><span>10</span><a href="#c10">Vues, QGIS, copie étudiante, droits et sauvegarde</a></li>
+    <li><span>11</span><a href="#c11">Exercices corrigés</a></li>
+    <li><span>A</span><a href="#annexe">Annexes : erreurs fréquentes et aide-mémoire</a></li>
+  </ol>
+</nav>
+
+<section class="chapitre" id="c0">
+<span class="num">Chapitre 0</span>
+<h2>Point de départ et objectifs</h2>
+<p>La partie 1 a transformé le DWG du lotissement en une couche QGIS propre, complétée par les noms des propriétaires grâce à une jointure avec le fichier Excel. Cette couche a ensuite été exportée par QGIS en un fichier <code>Malicouda_EST.sql</code> (un « dump »). Cette partie 2 part de ce fichier.</p>
+<div class="chaine">
+  <div class="etape"><b>1. DWG</b>Plan d'origine</div><span class="fl">&#8594;</span>
+  <div class="etape"><b>2. QGIS</b>Nettoyage + jointure Excel</div><span class="fl">&#8594;</span>
+  <div class="etape"><b>3. Dump SQL</b>Malicouda_EST.sql</div><span class="fl">&#8594;</span>
+  <div class="etape"><b>4. PostgreSQL</b>Base Malicounda_EST</div><span class="fl">&#8594;</span>
+  <div class="etape"><b>5. SQL</b>Interroger, contrôler, partager</div>
+</div>
+<h3>À la fin de cette partie, l'étudiant sait</h3>
+<ul>
+  <li>activer PostGIS et importer un dump SQL dans une base existante ;</li>
+  <li>lire la structure d'une table et comprendre les noms de colonnes « difficiles » ;</li>
+  <li>créer une table propre à partir d'une table brute (<code>CREATE TABLE</code>, <code>INSERT … SELECT</code>) ;</li>
+  <li>écrire des requêtes de lecture : filtres, tris, agrégats, regroupements ;</li>
+  <li>modifier des données sans risque grâce aux transactions ;</li>
+  <li>relier deux tables par une clé et écrire des jointures ;</li>
+  <li>mesurer, chercher des voisins, reconstituer des îlots et détecter des chevauchements avec PostGIS ;</li>
+  <li>publier des vues dans QGIS, protéger les données personnelles et sauvegarder la base.</li>
+</ul>
+<h3>Découpage en séances</h3>
+<div class="tablewrap"><table>
+<tr><th>Séance</th><th>Chapitres</th><th>Production attendue</th></tr>
+<tr><td>1</td><td>0 à 4</td><td>Dump importé, table <code>cad.parcelles</code> créée et indexée</td></tr>
+<tr><td>2</td><td>5 et 6</td><td>Premières statistiques du lotissement, colonnes calculées, débris supprimés</td></tr>
+<tr><td>3</td><td>7 et 8</td><td>Table des propriétaires, voisinages, table des îlots</td></tr>
+<tr><td>4</td><td>9 à 11</td><td>Vue des anomalies dans QGIS, copie anonymisée, exercices</td></tr>
+</table></div>
+<div class="note"><b>Le script du formateur</b>Toutes les requêtes de ce cours sont regroupées, dans l'ordre, dans le fichier <code>malicounda_est_cours.sql</code>. Les résultats affichés ont été obtenus en exécutant ce script sur le dump <code>Malicouda_EST.sql</code>. Les étudiants doivent retrouver les mêmes nombres.</div>
+<div class="piege"><b>Données personnelles</b>Le dump contient les prénoms et noms réels des attributaires. Ce support n'affiche volontairement aucun nom. Le chapitre 10 montre comment préparer une copie anonymisée à distribuer aux étudiants.</div>
+</section>
+<section class="chapitre" id="c1"><span class="num">Chapitre 1</span><h2>Préparer la base Malicounda_EST</h2><p class="duree">Séance 1 · 30 min</p>
+<h3>1.1 Ouvrir l'outil de requête</h3>
+<ol>
+  <li>Dans pgAdmin, déplier <b>Servers &gt; PostgreSQL 18 &gt; Databases</b>.</li>
+  <li>Cliquer sur la base <b>Malicounda_EST</b>, puis <b>Tools &gt; Query Tool</b> (ou clic droit &gt; <i>Query Tool</i>).</li>
+  <li>Vérifier en haut de l'onglet que la connexion indique bien <code>Malicounda_EST/postgres@PostgreSQL 18</code>.</li>
+</ol>
+<div class="piege"><b>Deux serveurs, une seule bonne base</b><p>pgAdmin affiche deux serveurs : PostgreSQL 16 (croix rouge : arrêté) et PostgreSQL 18. Toute la formation se fait sur <b>PostgreSQL 18</b>, dans la base <b>Malicounda_EST</b>, et pas dans la base <code>postgres</code> créée par défaut. Une requête lancée dans la mauvaise base « marche » mais crée les tables au mauvais endroit.</p></div>
+<h3>1.2 Activer PostGIS dans la base</h3><p>Le dump QGIS utilise la fonction <code>AddGeometryColumn</code>, qui n'existe que si PostGIS est activé <b>dans cette base</b>. Cette étape vient donc <b>avant</b> l'import.</p><pre><code><span class="k">CREATE EXTENSION</span> <span class="k">IF NOT EXISTS</span> postgis;   <span class="c">-- une seule fois par base</span>
+<span class="k">SELECT</span> PostGIS_Full_Version();            <span class="c">-- vérifier : doit afficher POSTGIS="3.x ..."</span></code></pre>
+<p>Pour exécuter : sélectionner les lignes puis appuyer sur <b>F5</b> (ou le bouton ▶). Sans sélection, pgAdmin exécute tout le contenu de l'onglet.</p><h3>1.3 Créer les schémas de travail</h3><p>Un <b>schéma</b> est un dossier de tables à l'intérieur de la base. On en crée deux :</p><pre><code><span class="k">CREATE SCHEMA</span> <span class="k">IF NOT EXISTS</span> brut;   <span class="c">-- données telles que livrées par QGIS : on n'y touche plus</span>
+<span class="k">CREATE SCHEMA</span> <span class="k">IF NOT EXISTS</span> cad;    <span class="c">-- tables propres sur lesquelles on travaille</span></code></pre>
+<div class="retenir"><b>À retenir</b><p>Une extension s'active base par base. <code>IF NOT EXISTS</code> évite une erreur si l'objet existe déjà : on peut relancer le script sans crainte.</p></div>
+</section><section class="chapitre" id="c2"><span class="num">Chapitre 2</span><h2>Importer le dump SQL produit par QGIS</h2><p class="duree">Séance 1 · 45 min</p>
+<h3>2.1 Que contient le fichier ?</h3>
+<p>Un dump est un simple fichier texte rempli d'instructions SQL. On peut l'ouvrir dans le Bloc-notes pour le lire (sans l'enregistrer). Celui de Malicounda Est contient, dans l'ordre :</p>
+<pre><code><span class="k">SET</span> standard_conforming_strings = <span class="k">ON</span>;
+<span class="k">DROP TABLE</span> <span class="k">IF EXISTS</span> "public"."malicouda est" <span class="k">CASCADE</span>;      <span class="c">-- supprime l'ancienne version</span>
+<span class="k">BEGIN</span>;                                                       <span class="c">-- début de transaction</span>
+<span class="k">CREATE TABLE</span> "public"."malicouda est"();                     <span class="c">-- table vide</span>
+<span class="k">ALTER TABLE</span> "public"."malicouda est" <span class="k">ADD COLUMN</span> "ogc_fid" <span class="k">SERIAL</span> ... <span class="k">PRIMARY KEY</span>;
+<span class="k">SELECT</span> AddGeometryColumn('public','malicouda est','wkb_geometry',32628,'MULTIPOLYGON',3);
+<span class="k">ALTER TABLE</span> "public"."malicouda est" <span class="k">ADD COLUMN</span> "n° du lot" <span class="k">VARCHAR</span>(80);
+<span class="c">-- ... 13 autres colonnes ...</span>
+<span class="k">INSERT INTO</span> "public"."malicouda est" (...) <span class="k">VALUES</span> ('01060000A0747F...', '3710', ...);
+<span class="c">-- ... 3 120 lignes INSERT, une par lot ...</span>
+<span class="k">CREATE INDEX</span> "malicouda est_wkb_geometry_geom_idx" <span class="k">ON</span> ... <span class="k">USING</span> GIST ("wkb_geometry");
+<span class="k">COMMIT</span>;                                                      <span class="c">-- validation</span></code></pre>
+
+<p>Trois remarques à faire aux étudiants :</p>
+<ul>
+  <li>Le nom de la table est <code>malicouda est</code> : une faute de frappe (il manque le <i>n</i>) et un espace. On la renommera au 2.4.</li>
+  <li>La géométrie est en <code>MULTIPOLYGON</code> avec <b>3</b> dimensions (X, Y, Z = 0). Le Z est inutile pour un plan cadastral : on le retirera au chapitre 4.</li>
+  <li>La longue suite hexadécimale <code>01060000A0747F…</code> est la géométrie codée en WKB. <code>747F</code> correspond au SRID 32628.</li>
+</ul>
+<div class="piege"><b>Attention au DROP TABLE</b><p>La deuxième ligne supprime la table si elle existe déjà. Relancer le dump efface donc toutes les modifications faites directement dans <code>public."malicouda est"</code>. C'est une raison de plus pour travailler dans une autre table (chapitre 4).</p></div>
+
+<h3>2.2 Méthode A : avec pgAdmin</h3>
+<ol>
+  <li>Dans l'outil de requête de la base <b>Malicounda_EST</b>, cliquer sur l'icône <b>dossier</b> (Open File) et choisir <code>Malicouda_EST.sql</code>.</li>
+  <li>Le fichier (environ 2 Mo) s'affiche dans l'éditeur. Appuyer sur <b>F5</b> sans rien sélectionner.</li>
+  <li>Attendre le message <i>Query returned successfully</i> dans l'onglet <b>Messages</b>.</li>
+  <li>Dans l'arbre, clic droit sur <b>Schemas &gt; public &gt; Tables</b> puis <b>Refresh</b> : la table <code>malicouda est</code> apparaît.</li>
+</ol>
+<h3>2.3 Méthode B : en ligne de commande avec psql</h3>
+<p>Plus rapide pour les gros fichiers. Ouvrir l'invite de commandes Windows dans le dossier du fichier :</p>
+<pre class="shell"><code>chcp 65001
+set PGCLIENTENCODING=UTF8
+"C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -d Malicounda_EST -f Malicouda_EST.sql</code></pre>
+<p class="legende"><code>chcp 65001</code> et <code>PGCLIENTENCODING=UTF8</code> évitent que les caractères « ° » et les accents soient abîmés. psql demande le mot de passe : ne jamais l'écrire dans la commande.</p><p>Un import réussi se termine par des lignes <code>INSERT 0 1</code> puis <code>CREATE INDEX</code> et <code>COMMIT</code>.</p><h3>2.4 Ranger la table importée</h3><p>On déplace la table dans le schéma <code>brut</code> et on lui donne un nom sans espace ni faute :</p><pre><code><span class="k">ALTER TABLE</span> public."malicouda est" <span class="k">SET</span> <span class="k">SCHEMA</span> brut;       <span class="c">-- change de dossier</span>
+<span class="k">ALTER TABLE</span> brut."malicouda est" <span class="k">RENAME</span> <span class="k">TO</span> lots_qgis;     <span class="c">-- change de nom</span></code></pre>
+<div class="astuce"><b>Vérifier tout de suite</b><p><code>SELECT COUNT(*) FROM brut.lots_qgis;</code> doit renvoyer <b>3120</b>.</p></div>
+</section><section class="chapitre" id="c3"><span class="num">Chapitre 3</span><h2>Découvrir la table importée</h2><p class="duree">Séance 1 · 45 min</p><h3>3.1 Lister les colonnes</h3><pre><code><span class="k">SELECT</span> column_name, data_type
+<span class="k">FROM</span> information_schema.columns
+<span class="k">WHERE</span> table_schema = 'brut' <span class="k">AND</span> table_name = 'lots_qgis'
+<span class="k">ORDER BY</span> ordinal_position;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>column_name</th><th>data_type</th></tr><tr><td>ogc_fid</td><td>integer</td></tr><tr><td>wkb_geometry</td><td>USER-DEFINED (geometry)</td></tr><tr><td>n° du lot</td><td>character varying</td></tr><tr><td>commune</td><td>character varying</td></tr><tr><td>village</td><td>character varying</td></tr><tr><td>nom lotiss</td><td>character varying</td></tr><tr><td>n ° dcm</td><td>character varying</td></tr><tr><td>n° arrete</td><td>character varying</td></tr><tr><td>nicad du l</td><td>character varying</td></tr><tr><td>superficie</td><td>numeric</td></tr><tr><td>cotes du l</td><td>character varying</td></tr><tr><td>mesure fro</td><td>character varying</td></tr><tr><td>orientatio</td><td>character varying</td></tr><tr><td>prenom</td><td>character varying</td></tr><tr><td>nom</td><td>character varying</td></tr><tr><td>n° cni</td><td>character varying</td></tr></table></div>
+<p>Les noms sont coupés à 10 caractères (<code>nom lotiss</code>, <code>orientatio</code>) : c'est la limite du format shapefile, par lequel la couche est passée dans QGIS. Ils contiennent aussi des espaces et des « ° ».</p><h3>3.2 Les guillemets doubles</h3><p>Un nom de colonne qui contient un espace, un accent, un symbole ou une majuscule doit être écrit <b>entre guillemets doubles</b>. Les guillemets simples, eux, servent aux valeurs de texte.</p><pre><code><span class="k">SELECT</span> n° du lot <span class="k">FROM</span> brut.lots_qgis;          <span class="c">-- ERREUR : syntax error at or near "°"</span>
+<span class="k">SELECT</span> "n° du lot" <span class="k">FROM</span> brut.lots_qgis;        <span class="c">-- correct : nom de colonne</span>
+<span class="k">SELECT</span> * <span class="k">FROM</span> brut.lots_qgis
+<span class="k">WHERE</span> "n° du lot" = '3710';                    <span class="c">-- "colonne"  et  'valeur'</span></code></pre>
+<div class="retenir"><b>À retenir</b><p><code>"…"</code> = un nom (table, colonne). <code>'…'</code> = une valeur (texte, date). Pour éviter les guillemets, on donnera des noms simples à nos propres colonnes : minuscules, sans accent, mots séparés par <code>_</code>.</p></div>
+<h3>3.3 Premières lignes et géométrie</h3><pre><code><span class="k">SELECT</span> ogc_fid, "n° du lot", superficie
+<span class="k">FROM</span> brut.lots_qgis
+<span class="k">LIMIT</span> 5;                                        <span class="c">-- seulement 5 lignes</span>
+
+<span class="k">SELECT</span> GeometryType(wkb_geometry) <span class="k">AS</span> type_geom,
+       ST_NDims(wkb_geometry)     <span class="k">AS</span> dimensions,
+       ST_SRID(wkb_geometry)      <span class="k">AS</span> srid,
+       COUNT(*)                   <span class="k">AS</span> nombre
+<span class="k">FROM</span> brut.lots_qgis
+<span class="k">GROUP BY</span> 1, 2, 3;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>ogc_fid</th><th>n° du lot</th><th>superficie</th></tr><tr><td>1</td><td>3710</td><td>300</td></tr><tr><td>2</td><td>3709</td><td>300</td></tr><tr><td>3</td><td></td><td>2200</td></tr><tr><td>4</td><td></td><td>990</td></tr><tr><td>5</td><td></td><td>990</td></tr></table></div>
+<div class="tablewrap"><table class="resultat"><tr><th>type_geom</th><th>dimensions</th><th>srid</th><th>nombre</th></tr><tr><td>MULTIPOLYGON</td><td>3</td><td>32628</td><td>3120</td></tr></table></div><p class="legende">Tous les lots sont des multipolygones 3D en UTM 28 Nord. Le SRID est correct.</p>
+<div class="astuce"><b>Voir la carte dans pgAdmin</b><p>Dans le résultat d'une requête qui contient <code>wkb_geometry</code>, une icône en forme d'œil apparaît dans l'en-tête de la colonne : elle ouvre le <b>Geometry Viewer</b> qui dessine les lots sur un fond de carte.</p></div>
+</section><section class="chapitre" id="c4"><span class="num">Chapitre 4</span><h2>Créer la table de travail cad.parcelles</h2><p class="duree">Séance 1 · 1 h</p><p>On construit une table propre : noms de colonnes simples, géométrie en 2D, chaînes vides remplacées par <code>NULL</code>. La table brute reste intacte et sert de référence.</p><h3>4.1 Créer la structure : CREATE TABLE</h3><pre><code><span class="k">CREATE TABLE</span> cad.parcelles (
+    id           <span class="k">INTEGER</span> <span class="k">PRIMARY KEY</span>,           <span class="c">-- reprend ogc_fid ; unique et obligatoire</span>
+    num_lot      <span class="k">VARCHAR</span>(80),
+    commune      <span class="k">VARCHAR</span>(80),
+    village      <span class="k">VARCHAR</span>(80),
+    lotissement  <span class="k">VARCHAR</span>(80),
+    num_dcm      <span class="k">VARCHAR</span>(80),
+    num_arrete   <span class="k">VARCHAR</span>(80),
+    nicad        <span class="k">VARCHAR</span>(80),
+    superficie   <span class="k">NUMERIC</span>(10,0),                 <span class="c">-- surface déclarée en m²</span>
+    prenom       <span class="k">VARCHAR</span>(80),
+    nom          <span class="k">VARCHAR</span>(80),
+    num_cni      <span class="k">VARCHAR</span>(80),
+    geom         geometry(MultiPolygon, 32628)  <span class="c">-- 2D, UTM 28 N</span>
+);</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>Élément</th><th>Signification</th></tr><tr><td>INTEGER</td><td>nombre entier</td></tr><tr><td>VARCHAR(80)</td><td>texte de 80 caractères au plus</td></tr><tr><td>NUMERIC(10,0)</td><td>nombre de 10 chiffres sans décimale</td></tr><tr><td>PRIMARY KEY</td><td>identifiant unique et jamais vide de chaque ligne</td></tr><tr><td>geometry(MultiPolygon, 32628)</td><td>colonne spatiale qui n&#x27;accepte que des multipolygones 2D en EPSG:32628</td></tr></table></div>
+<h3>4.2 Remplir à partir de la table brute : INSERT … SELECT</h3><pre><code><span class="k">INSERT INTO</span> cad.parcelles
+      (id, num_lot, commune, village, lotissement, num_dcm, num_arrete,
+       nicad, superficie, prenom, nom, num_cni, geom)
+<span class="k">SELECT</span> ogc_fid,
+       NULLIF(TRIM("n° du lot"), ''),   <span class="c">-- espaces retirés ; texte vide -&gt; NULL</span>
+       commune,
+       village,
+       "nom lotiss",
+       "n ° dcm",
+       "n° arrete",
+       "nicad du l",
+       superficie,
+       NULLIF(TRIM(prenom), ''),
+       NULLIF(TRIM(nom), ''),
+       "n° cni",
+       ST_Force2D(wkb_geometry)          <span class="c">-- supprime la coordonnée Z</span>
+<span class="k">FROM</span> brut.lots_qgis;</code></pre>
+<ul>
+<li><code>TRIM(x)</code> enlève les espaces au début et à la fin.</li>
+<li><code>NULLIF(x, '')</code> renvoie <code>NULL</code> si x est vide. Ainsi « pas de numéro » s'écrit toujours de la même façon.</li>
+<li><code>ST_Force2D</code> est indispensable : sans elle, PostgreSQL refuse d'insérer une géométrie 3D dans une colonne 2D (<i>Column has Z dimension but geometry does not</i>).</li>
+</ul><h3>4.3 Index, commentaires et statistiques</h3><pre><code><span class="k">CREATE INDEX</span> idx_parcelles_geom    <span class="k">ON</span> cad.parcelles <span class="k">USING</span> GIST (geom);   <span class="c">-- index spatial</span>
+<span class="k">CREATE INDEX</span> idx_parcelles_num_lot <span class="k">ON</span> cad.parcelles (num_lot);          <span class="c">-- index classique</span>
+
+<span class="k">COMMENT ON</span> <span class="k">TABLE</span>  cad.parcelles            <span class="k">IS</span> 'Lots du lotissement de Malicounda Est';
+<span class="k">COMMENT ON</span> <span class="k">COLUMN</span> cad.parcelles.superficie <span class="k">IS</span> 'Surface déclarée en m² (issue du plan)';
+
+<span class="k">ANALYZE</span> cad.parcelles;          <span class="c">-- met à jour les statistiques utilisées par PostgreSQL</span>
+
+<span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> cad.parcelles;   <span class="c">-- résultat attendu : 3120</span></code></pre>
+<div class="note"><b>Pourquoi un index ?</b><p>Un index est comme l'index d'un livre : au lieu de lire les 3 120 lots, PostgreSQL va directement aux bons. L'index <code>GIST</code> accélère toutes les recherches spatiales (<code>ST_Intersects</code>, <code>ST_DWithin</code>, <code>ST_Touches</code>…).</p></div>
+</section><section class="chapitre" id="c5"><span class="num">Chapitre 5</span><h2>Les bases du SQL : lire et résumer</h2><p class="duree">Séance 2 · 1 h 45</p><p>Une requête de lecture suit toujours le même ordre : <code>SELECT</code> (quelles colonnes) <code>FROM</code> (quelle table) <code>WHERE</code> (quelles lignes) <code>GROUP BY</code> (regrouper) <code>HAVING</code> (filtrer les groupes) <code>ORDER BY</code> (trier) <code>LIMIT</code> (combien).</p><h3>5.1 Choisir les colonnes et les lignes</h3><pre><code><span class="k">SELECT</span> id, num_lot, superficie
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> superficie &gt; 1000          <span class="c">-- lots de plus de 1 000 m²</span>
+<span class="k">ORDER BY</span> superficie <span class="k">DESC</span>         <span class="c">-- du plus grand au plus petit</span>
+<span class="k">LIMIT</span> 10;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>id</th><th>num_lot</th><th>superficie</th></tr><tr><td>1725</td><td>NULL</td><td>18543</td></tr><tr><td>556</td><td>2944</td><td>17088</td></tr><tr><td>3048</td><td>NULL</td><td>13842</td></tr><tr><td>2726</td><td>4378</td><td>10865</td></tr><tr><td>…</td><td>…</td><td>…</td></tr></table></div><p class="legende">Les plus grands lots n'ont souvent pas de numéro : ce sont probablement des équipements ou des réserves.</p>
+<h3>5.2 Combiner des conditions</h3><pre><code><span class="k">SELECT</span> id, num_lot, superficie
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> superficie <span class="k">BETWEEN</span> 295 <span class="k">AND</span> 305    <span class="c">-- bornes comprises</span>
+  <span class="k">AND</span> nom <span class="k">IS</span> <span class="k">NOT</span> <span class="k">NULL</span>                   <span class="c">-- lot attribué</span>
+<span class="k">ORDER BY</span> num_lot
+<span class="k">LIMIT</span> 10;
+
+<span class="k">SELECT</span> id, num_lot
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> num_lot <span class="k">IN</span> ('3709', '3710');      <span class="c">-- liste de valeurs</span></code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>Opérateur</th><th>Exemple</th><th>Sens</th></tr><tr><td>=  &lt;&gt;  &lt;  &gt;  &lt;=  &gt;=</td><td>superficie &gt;= 300</td><td>comparaison</td></tr><tr><td>AND / OR / NOT</td><td>a AND (b OR c)</td><td>combiner (mettre des parenthèses avec OR)</td></tr><tr><td>BETWEEN</td><td>superficie BETWEEN 295 AND 305</td><td>entre deux bornes incluses</td></tr><tr><td>IN</td><td>num_lot IN (&#x27;3709&#x27;,&#x27;3710&#x27;)</td><td>dans une liste</td></tr><tr><td>IS NULL / IS NOT NULL</td><td>nom IS NULL</td><td>valeur absente ; jamais « = NULL »</td></tr></table></div>
+<h3>5.3 Chercher dans du texte : LIKE et ILIKE</h3><pre><code><span class="k">SELECT</span> num_lot <span class="k">FROM</span> cad.parcelles <span class="k">WHERE</span> num_lot <span class="k">LIKE</span> 'LOT%' <span class="k">LIMIT</span> 10;   <span class="c">-- commence par LOT</span>
+<span class="k">SELECT</span> num_lot <span class="k">FROM</span> cad.parcelles <span class="k">WHERE</span> num_lot <span class="k">LIKE</span> '%;%'  <span class="k">LIMIT</span> 10;   <span class="c">-- contient un ;</span>
+<span class="k">SELECT</span> num_lot <span class="k">FROM</span> cad.parcelles <span class="k">WHERE</span> num_lot <span class="k">ILIKE</span> '%bis%';          <span class="c">-- bis, BIS, Bis...</span></code></pre>
+<p><code>%</code> remplace n'importe quelle suite de caractères, <code>_</code> un seul caractère. <code>ILIKE</code> ignore les majuscules. On découvre ainsi plusieurs façons de numéroter : <code>3710</code>, <code>LOT 11 K</code>, <code>2228;2230</code>, <code>4518BIS</code>, <code>2934A</code>.</p><h3>5.4 Compter les valeurs manquantes</h3><pre><code><span class="k">SELECT</span> COUNT(*)        <span class="k">AS</span> total,
+       COUNT(num_lot)  <span class="k">AS</span> avec_numero,         <span class="c">-- COUNT(colonne) ignore les NULL</span>
+       COUNT(nom)      <span class="k">AS</span> avec_proprietaire,
+       COUNT(nicad)    <span class="k">AS</span> avec_nicad
+<span class="k">FROM</span> cad.parcelles;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>total</th><th>avec_numero</th><th>avec_proprietaire</th><th>avec_nicad</th></tr><tr><td>3120</td><td>2863</td><td>2338</td><td>0</td></tr></table></div><p class="legende">257 lots sans numéro, 782 sans propriétaire, et aucun NICAD saisi pour l'instant.</p>
+<h3>5.5 Valeurs distinctes</h3><pre><code><span class="k">SELECT</span> <span class="k">DISTINCT</span> commune, village, lotissement <span class="k">FROM</span> cad.parcelles;
+<span class="k">SELECT</span> COUNT(<span class="k">DISTINCT</span> num_lot) <span class="k">AS</span> numeros_differents <span class="k">FROM</span> cad.parcelles;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>commune</th><th>village</th><th>lotissement</th></tr><tr><td>7</td><td>7</td><td>MALICOUNDA EST</td></tr></table></div>
+<p>Il y a 2 646 numéros différents pour 2 863 lots numérotés : certains numéros sont donc utilisés plusieurs fois. La commune et le village valent « 7 » : un code à remplacer (exercice 11).</p><h3>5.6 Les fonctions d'agrégat</h3><pre><code><span class="k">SELECT</span> COUNT(*)                 <span class="k">AS</span> nb_lots,
+       MIN(superficie)          <span class="k">AS</span> mini_m2,
+       MAX(superficie)          <span class="k">AS</span> maxi_m2,
+       ROUND(AVG(superficie))   <span class="k">AS</span> moyenne_m2,
+       SUM(superficie) / 10000  <span class="k">AS</span> total_ha
+<span class="k">FROM</span> cad.parcelles;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>nb_lots</th><th>mini_m2</th><th>maxi_m2</th><th>moyenne_m2</th><th>total_ha</th></tr><tr><td>3120</td><td>0</td><td>18543</td><td>339</td><td>105.6148</td></tr></table></div><p class="legende">Une superficie minimale de 0 m² signale des polygones parasites : on les traitera au chapitre 6.</p>
+<h3>5.7 Regrouper : GROUP BY et HAVING</h3><pre><code><span class="c">-- Les superficies les plus fréquentes</span>
+<span class="k">SELECT</span> superficie, COUNT(*) <span class="k">AS</span> nombre
+<span class="k">FROM</span> cad.parcelles
+<span class="k">GROUP BY</span> superficie
+<span class="k">ORDER BY</span> nombre <span class="k">DESC</span>
+<span class="k">LIMIT</span> 5;
+
+<span class="c">-- Les numéros utilisés plusieurs fois</span>
+<span class="k">SELECT</span> num_lot, COUNT(*) <span class="k">AS</span> nombre
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> num_lot <span class="k">IS</span> <span class="k">NOT</span> <span class="k">NULL</span>          <span class="c">-- WHERE filtre les lignes AVANT le regroupement</span>
+<span class="k">GROUP BY</span> num_lot
+<span class="k">HAVING</span> COUNT(*) &gt; 1                <span class="c">-- HAVING filtre les groupes APRÈS</span>
+<span class="k">ORDER BY</span> nombre <span class="k">DESC</span>, num_lot
+<span class="k">LIMIT</span> 15;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>superficie</th><th>nombre</th></tr><tr><td>300</td><td>1311</td></tr><tr><td>303</td><td>131</td></tr><tr><td>299</td><td>119</td></tr><tr><td>306</td><td>95</td></tr><tr><td>296</td><td>84</td></tr></table></div><p class="legende">Le lot type de Malicounda Est fait 300 m² (souvent 15 m × 20 m).</p>
+<div class="tablewrap"><table class="resultat"><tr><th>num_lot</th><th>nombre</th></tr><tr><td>5086</td><td>11</td></tr><tr><td>4343</td><td>7</td></tr><tr><td>4019</td><td>6</td></tr><tr><td>5059</td><td>6</td></tr><tr><td>23</td><td>4</td></tr><tr><td>4018</td><td>4</td></tr><tr><td>…</td><td>…</td></tr></table></div><p class="legende">175 numéros apparaissent au moins deux fois.</p>
+<h3>5.8 Classer avec CASE</h3><pre><code><span class="k">SELECT</span> <span class="k">CASE</span>
+         <span class="k">WHEN</span> superficie &lt; 100  <span class="k">THEN</span> '1. moins de 100 m²'
+         <span class="k">WHEN</span> superficie &lt; 300  <span class="k">THEN</span> '2. 100 à 299 m²'
+         <span class="k">WHEN</span> superficie &lt;= 310 <span class="k">THEN</span> '3. 300 à 310 m² (standard)'
+         <span class="k">WHEN</span> superficie &lt; 1000 <span class="k">THEN</span> '4. 311 à 999 m²'
+         <span class="k">ELSE</span>                        '5. 1000 m² et plus'
+       <span class="k">END</span>       <span class="k">AS</span> classe,
+       COUNT(*)  <span class="k">AS</span> nombre
+<span class="k">FROM</span> cad.parcelles
+<span class="k">GROUP BY</span> classe
+<span class="k">ORDER BY</span> classe;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>classe</th><th>nombre</th></tr><tr><td>1. moins de 100 m²</td><td>77</td></tr><tr><td>2. 100 à 299 m²</td><td>818</td></tr><tr><td>3. 300 à 310 m² (standard)</td><td>1881</td></tr><tr><td>4. 311 à 999 m²</td><td>313</td></tr><tr><td>5. 1000 m² et plus</td><td>31</td></tr></table></div>
+<h3>5.9 Fonctions sur le texte</h3><pre><code><span class="k">SELECT</span> num_lot,
+       UPPER(num_lot)                <span class="k">AS</span> majuscules,
+       LENGTH(num_lot)               <span class="k">AS</span> longueur,
+       SPLIT_PART(num_lot, ';', 1)   <span class="k">AS</span> premier_numero,
+       CONCAT_WS(' ', prenom, nom)   <span class="k">AS</span> proprietaire     <span class="c">-- ignore les NULL</span>
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> num_lot <span class="k">LIKE</span> '%;%'
+<span class="k">LIMIT</span> 5;</code></pre>
+<div class="piege"><b>NULL contamine les calculs</b><p><code>prenom || ' ' || nom</code> donne <code>NULL</code> dès que l'un des deux est vide. <code>CONCAT_WS(' ', prenom, nom)</code> ignore les valeurs absentes. De même, <code>300 + NULL</code> vaut <code>NULL</code>.</p></div>
+<div class="note"><b>Une trace de la jointure QGIS</b><p>Sur 26 lots, la colonne <code>prenom</code> contient plusieurs personnes séparées par <code>||</code>. QGIS a fusionné ainsi les lignes Excel qui portaient le même numéro de lot. On les retrouve avec <code>WHERE prenom LIKE '%||%'</code>. Ce sont des copropriétés ou des doublons de l'Excel, à vérifier avec le service.</p></div>
+</section><section class="chapitre" id="c6"><span class="num">Chapitre 6</span><h2>Modifier les données en sécurité</h2><p class="duree">Séance 2 · 1 h 15</p><h3>6.1 Ajouter des colonnes et les remplir : ALTER TABLE et UPDATE</h3><pre><code><span class="k">ALTER TABLE</span> cad.parcelles <span class="k">ADD COLUMN</span> surface_calc <span class="k">NUMERIC</span>(10,2);
+<span class="k">UPDATE</span> cad.parcelles <span class="k">SET</span> surface_calc = ROUND(ST_Area(geom)::numeric, 2);
+
+<span class="k">ALTER TABLE</span> cad.parcelles <span class="k">ADD COLUMN</span> type_numero <span class="k">VARCHAR</span>(20);
+<span class="k">UPDATE</span> cad.parcelles
+<span class="k">SET</span> type_numero = <span class="k">CASE</span>
+      <span class="k">WHEN</span> num_lot <span class="k">IS</span> <span class="k">NULL</span>       <span class="k">THEN</span> 'absent'
+      <span class="k">WHEN</span> num_lot ~ '^[0-9]+$'  <span class="k">THEN</span> 'numerique'      <span class="c">-- ~ : expression régulière</span>
+      <span class="k">WHEN</span> num_lot <span class="k">LIKE</span> '%;%'    <span class="k">THEN</span> 'multiple'
+      <span class="k">WHEN</span> num_lot <span class="k">ILIKE</span> 'LOT%'  <span class="k">THEN</span> 'ancien (LOT)'
+      <span class="k">ELSE</span>                            'avec suffixe'
+    <span class="k">END</span>;
+
+<span class="k">SELECT</span> type_numero, COUNT(*) <span class="k">FROM</span> cad.parcelles <span class="k">GROUP BY</span> type_numero <span class="k">ORDER BY</span> 2 <span class="k">DESC</span>;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>type_numero</th><th>count</th></tr><tr><td>numerique</td><td>2401</td></tr><tr><td>ancien (LOT)</td><td>330</td></tr><tr><td>absent</td><td>257</td></tr><tr><td>avec suffixe</td><td>85</td></tr><tr><td>multiple</td><td>47</td></tr></table></div>
+<p><code>^[0-9]+$</code> se lit : « du début (<code>^</code>) à la fin (<code>$</code>), un ou plusieurs (<code>+</code>) chiffres (<code>[0-9]</code>) ».</p><h3>6.2 La transaction : un filet de sécurité</h3><div class="piege"><b>UPDATE et DELETE sans WHERE</b><p>Ils s'appliquent à <b>toutes</b> les lignes. Règle : écrire d'abord le <code>SELECT</code> avec la même condition, regarder le résultat, puis travailler dans une transaction.</p></div>
+<p>On supprime les « débris » : des polygones de moins de 1 m² hérités du nettoyage du DWG.</p><pre><code><span class="k">BEGIN</span>;                                                       <span class="c">-- ouvrir la transaction</span>
+<span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> cad.parcelles <span class="k">WHERE</span> ST_Area(geom) &lt; 1;  <span class="c">-- 1. voir : 46 lignes</span>
+<span class="k">CREATE TABLE</span> cad.debris <span class="k">AS</span>
+    <span class="k">SELECT</span> * <span class="k">FROM</span> cad.parcelles <span class="k">WHERE</span> ST_Area(geom) &lt; 1;     <span class="c">-- 2. garder une trace</span>
+<span class="k">DELETE FROM</span> cad.parcelles <span class="k">WHERE</span> ST_Area(geom) &lt; 1;           <span class="c">-- 3. supprimer</span>
+<span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> cad.parcelles;                          <span class="c">-- 4. vérifier : 3074</span>
+<span class="k">COMMIT</span>;                                                      <span class="c">-- valider ... ou ROLLBACK;</span></code></pre>
+<p>Tant que <code>COMMIT</code> n'est pas lancé, <code>ROLLBACK</code> annule tout. Faire l'essai : lancer les étapes 1 à 4, puis <code>ROLLBACK</code>, et constater que les 3 120 lots sont revenus. Recommencer ensuite avec <code>COMMIT</code>.</p><h3>6.3 Les contraintes : faire respecter des règles</h3><pre><code><span class="c">-- Un numéro de lot devrait être unique... essayons :</span>
+<span class="k">ALTER TABLE</span> cad.parcelles <span class="k">ADD CONSTRAINT</span> uq_num_lot <span class="k">UNIQUE</span> (num_lot);
+<span class="c">-- ERREUR : could not create unique index "uq_num_lot"</span>
+<span class="c">--          Key (num_lot)=(...) is duplicated.</span>
+
+<span class="c">-- Une superficie doit être positive : maintenant que les débris sont supprimés, ça passe</span>
+<span class="k">ALTER TABLE</span> cad.parcelles
+    <span class="k">ADD CONSTRAINT</span> ck_superficie_positive <span class="k">CHECK</span> (superficie &gt; 0);</code></pre>
+<p>L'erreur est instructive : la base refuse une règle que les données ne respectent pas. Il faudra d'abord régler les numéros en double (chapitre 9). Le <code>CHECK</code>, lui, empêchera désormais toute saisie d'une superficie nulle ou négative.</p></section><section class="chapitre" id="c7"><span class="num">Chapitre 7</span><h2>Plusieurs tables : clés et jointures</h2><p class="duree">Séance 3 · 1 h 15</p><p>Un même propriétaire peut avoir plusieurs lots. Répéter son nom sur chaque lot crée des risques d'incohérence (fautes de frappe différentes). On range donc les propriétaires dans leur propre table, et chaque lot pointe vers son propriétaire par un numéro : la <b>clé étrangère</b>.</p><h3>7.1 Créer la table des propriétaires</h3><pre><code><span class="k">CREATE TABLE</span> cad.proprietaires (
+    id      <span class="k">SERIAL</span> <span class="k">PRIMARY KEY</span>,        <span class="c">-- numéro automatique 1, 2, 3...</span>
+    prenom  <span class="k">VARCHAR</span>(80),
+    nom     <span class="k">VARCHAR</span>(80) <span class="k">NOT</span> <span class="k">NULL</span>,      <span class="c">-- obligatoire</span>
+    <span class="k">UNIQUE</span> (prenom, nom)               <span class="c">-- pas deux fois la même personne</span>
+);
+
+<span class="k">INSERT INTO</span> cad.proprietaires (prenom, nom)
+<span class="k">SELECT</span> <span class="k">DISTINCT</span> prenom, nom
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> nom <span class="k">IS</span> <span class="k">NOT</span> <span class="k">NULL</span>
+<span class="k">ORDER BY</span> nom, prenom;</code></pre>
+<h3>7.2 Relier chaque lot à son propriétaire</h3><pre><code><span class="k">ALTER TABLE</span> cad.parcelles
+    <span class="k">ADD COLUMN</span> proprietaire_id <span class="k">INTEGER</span> <span class="k">REFERENCES</span> cad.proprietaires (id);
+
+<span class="k">UPDATE</span> cad.parcelles p
+<span class="k">SET</span> proprietaire_id = pr.id
+<span class="k">FROM</span> cad.proprietaires pr
+<span class="k">WHERE</span> pr.nom = p.nom
+  <span class="k">AND</span> pr.prenom <span class="k">IS</span> <span class="k">NOT</span> <span class="k">DISTINCT</span> <span class="k">FROM</span> p.prenom;   <span class="c">-- égal, même si les deux sont NULL</span>
+
+<span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> cad.proprietaires;                                   <span class="c">-- 1594</span>
+<span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> cad.parcelles <span class="k">WHERE</span> proprietaire_id <span class="k">IS</span> <span class="k">NOT</span> <span class="k">NULL</span>;     <span class="c">-- 2338</span></code></pre>
+<div class="note"><b>REFERENCES</b><p><code>REFERENCES cad.proprietaires (id)</code> garantit qu'un lot ne peut pas pointer vers un propriétaire qui n'existe pas, et qu'on ne peut pas supprimer un propriétaire qui a encore des lots.</p></div>
+<h3>7.3 La jointure interne : JOIN</h3><pre><code><span class="k">SELECT</span> p.num_lot, p.superficie, pr.prenom, pr.nom
+<span class="k">FROM</span> cad.parcelles p                                <span class="c">-- p : alias court</span>
+<span class="k">JOIN</span> cad.proprietaires pr <span class="k">ON</span> pr.id = p.proprietaire_id
+<span class="k">ORDER BY</span> pr.nom, pr.prenom
+<span class="k">LIMIT</span> 10;</code></pre>
+<p><code>JOIN</code> ne garde que les lots qui ont un propriétaire. Les alias <code>p</code> et <code>pr</code> évitent de répéter le nom complet des tables.</p><h3>7.4 La jointure externe : LEFT JOIN</h3><pre><code><span class="k">SELECT</span> pr.id, COUNT(p.id) <span class="k">AS</span> nb_lots, SUM(p.superficie) <span class="k">AS</span> surface_m2
+<span class="k">FROM</span> cad.proprietaires pr
+<span class="k">LEFT JOIN</span> cad.parcelles p <span class="k">ON</span> p.proprietaire_id = pr.id   <span class="c">-- garde tous les propriétaires</span>
+<span class="k">GROUP BY</span> pr.id
+<span class="k">ORDER BY</span> nb_lots <span class="k">DESC</span>
+<span class="k">LIMIT</span> 5;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>id</th><th>nb_lots</th><th>surface_m2</th></tr><tr><td>240</td><td>25</td><td>8787</td></tr><tr><td>1560</td><td>18</td><td>4838</td></tr><tr><td>494</td><td>14</td><td>4231</td></tr><tr><td>498</td><td>11</td><td>3312</td></tr><tr><td>813</td><td>11</td><td>3278</td></tr></table></div><p class="legende">Les identifiants suffisent ici ; on n'affiche pas les noms.</p>
+<h3>7.5 Sous-requête et requête nommée (WITH)</h3><pre><code><span class="c">-- Combien de lots sont plus grands que la moyenne ?</span>
+<span class="k">SELECT</span> COUNT(*)
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> superficie &gt; (<span class="k">SELECT</span> AVG(superficie) <span class="k">FROM</span> cad.parcelles);     <span class="c">-- 153</span>
+
+<span class="c">-- Combien de propriétaires ont 1 lot, 2 lots, 3 lots... ?</span>
+<span class="k">WITH</span> par_proprietaire <span class="k">AS</span> (
+    <span class="k">SELECT</span> proprietaire_id, COUNT(*) <span class="k">AS</span> nb_lots
+    <span class="k">FROM</span> cad.parcelles
+    <span class="k">WHERE</span> proprietaire_id <span class="k">IS</span> <span class="k">NOT</span> <span class="k">NULL</span>
+    <span class="k">GROUP BY</span> proprietaire_id
+)
+<span class="k">SELECT</span> nb_lots, COUNT(*) <span class="k">AS</span> nb_proprietaires
+<span class="k">FROM</span> par_proprietaire
+<span class="k">GROUP BY</span> nb_lots
+<span class="k">ORDER BY</span> nb_lots;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>nb_lots</th><th>nb_proprietaires</th></tr><tr><td>1</td><td>1191</td></tr><tr><td>2</td><td>255</td></tr><tr><td>3</td><td>80</td></tr><tr><td>4</td><td>35</td></tr><tr><td>5</td><td>13</td></tr><tr><td>6 et plus</td><td>20</td></tr></table></div>
+<p><code>WITH</code> donne un nom à une requête intermédiaire, que l'on réutilise ensuite comme une table. C'est plus lisible qu'une sous-requête imbriquée.</p></section><section class="chapitre" id="c8"><span class="num">Chapitre 8</span><h2>Les requêtes spatiales</h2><p class="duree">Séance 3 · 1 h 45</p><h3>8.1 Mesurer</h3><pre><code><span class="k">SELECT</span> num_lot,
+       superficie,
+       ROUND(ST_Area(geom)::numeric, 1)      <span class="k">AS</span> surface_m2,
+       ROUND(ST_Perimeter(geom)::numeric, 1) <span class="k">AS</span> perimetre_m
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> num_lot <span class="k">IN</span> ('3709', '3710');
+
+<span class="k">SELECT</span> ROUND((SUM(ST_Area(geom)) / 10000)::numeric, 2) <span class="k">AS</span> surface_totale_ha
+<span class="k">FROM</span> cad.parcelles;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>num_lot</th><th>superficie</th><th>surface_m2</th><th>perimetre_m</th></tr><tr><td>3709</td><td>300</td><td>300.0</td><td>70.0</td></tr><tr><td>3710</td><td>300</td><td>300.0</td><td>70.0</td></tr></table></div>
+<p>Surface totale : <b>105,62 ha</b>. Les mesures sont en mètres car le SRID 32628 est en mètres. <code>::numeric</code> convertit le résultat pour pouvoir l'arrondir avec <code>ROUND</code>.</p><h3>8.2 Comparer surface déclarée et surface calculée</h3><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FILTER</span> (<span class="k">WHERE</span> ABS(superficie - ST_Area(geom)) &lt;= 1) <span class="k">AS</span> ecart_max_1m2,
+       COUNT(*) <span class="k">FILTER</span> (<span class="k">WHERE</span> ABS(superficie - ST_Area(geom)) &gt;  1) <span class="k">AS</span> ecart_plus_1m2
+<span class="k">FROM</span> cad.parcelles;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>ecart_max_1m2</th><th>ecart_plus_1m2</th></tr><tr><td>3074</td><td>0</td></tr></table></div><p class="legende">La colonne SUPERFICIE a été calculée depuis les polygones : elle est cohérente partout.</p>
+<h3>8.3 Coordonnées UTM et GPS</h3><pre><code><span class="k">SELECT</span> num_lot,
+       ROUND(ST_X(ST_PointOnSurface(geom))::numeric, 2) <span class="k">AS</span> x_utm,
+       ROUND(ST_Y(ST_PointOnSurface(geom))::numeric, 2) <span class="k">AS</span> y_utm,
+       ROUND(ST_X(ST_Transform(ST_PointOnSurface(geom), 4326))::numeric, 6) <span class="k">AS</span> longitude,
+       ROUND(ST_Y(ST_Transform(ST_PointOnSurface(geom), 4326))::numeric, 6) <span class="k">AS</span> latitude
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> num_lot = '3710';</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>num_lot</th><th>x_utm</th><th>y_utm</th><th>longitude</th><th>latitude</th></tr><tr><td>3710</td><td>288945.74</td><td>1598255.28</td><td>-16.957897</td><td>14.448737</td></tr></table></div><p class="legende">ST_PointOnSurface donne un point garanti à l'intérieur du lot ; ST_Transform le convertit en degrés WGS 84 (à coller dans Google Maps : 14.448737, -16.957897).</p>
+<h3>8.4 Les voisins d'un lot : ST_Touches</h3><pre><code><span class="k">SELECT</span> v.num_lot, v.superficie
+<span class="k">FROM</span> cad.parcelles p
+<span class="k">JOIN</span> cad.parcelles v <span class="k">ON</span> ST_Touches(p.geom, v.geom)   <span class="c">-- la table jointe à elle-même</span>
+<span class="k">WHERE</span> p.num_lot = '3710'
+<span class="k">ORDER BY</span> v.num_lot;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>num_lot</th><th>superficie</th></tr><tr><td>3707</td><td>300</td></tr><tr><td>3708</td><td>300</td></tr><tr><td>3709</td><td>300</td></tr></table></div>
+<p>C'est une <b>jointure spatiale</b> : la condition <code>ON</code> n'est plus une égalité de clés mais une relation géométrique.</p><h3>8.5 Recherche dans un rayon : ST_DWithin</h3><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">AS</span> lots_a_moins_de_50m
+<span class="k">FROM</span> cad.parcelles p
+<span class="k">JOIN</span> cad.parcelles v <span class="k">ON</span> ST_DWithin(p.geom, v.geom, 50)   <span class="c">-- 50 m</span>
+                    <span class="k">AND</span> v.id &lt;&gt; p.id                     <span class="c">-- sans le lot lui-même</span>
+<span class="k">WHERE</span> p.num_lot = '3710';                                <span class="c">-- 11</span></code></pre>
+<h3>8.6 Les lots les plus proches d'un point GPS</h3><pre><code><span class="k">SELECT</span> num_lot,
+       ROUND(ST_Distance(geom, pt)::numeric, 1) <span class="k">AS</span> distance_m
+<span class="k">FROM</span> cad.parcelles,
+     ST_Transform(ST_SetSRID(ST_MakePoint(-16.9554, 14.4571), 4326), 32628) <span class="k">AS</span> pt
+<span class="k">ORDER BY</span> geom &lt;-&gt; pt          <span class="c">-- &lt;-&gt; : tri par distance qui utilise l'index</span>
+<span class="k">LIMIT</span> 5;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>num_lot</th><th>distance_m</th></tr><tr><td>4025</td><td>35.2</td></tr><tr><td>4019</td><td>35.5</td></tr><tr><td>4019</td><td>48.8</td></tr><tr><td>4018</td><td>49.8</td></tr><tr><td>4023</td><td>52.5</td></tr></table></div><p class="legende">Le numéro 4019 apparaît deux fois : deux lots différents portent le même numéro.</p>
+<p>Le point GPS (longitude, latitude) est créé avec <code>ST_MakePoint</code>, étiqueté en 4326 avec <code>ST_SetSRID</code>, puis converti en UTM avec <code>ST_Transform</code> pour être comparable aux lots.</p><h3>8.7 Reconstituer les îlots</h3><p>Un îlot est un groupe de lots qui se touchent, entouré de voies. <code>ST_ClusterDBSCAN</code> numérote automatiquement les groupes de géométries distantes de moins de 0,5 m.</p><pre><code><span class="k">ALTER TABLE</span> cad.parcelles <span class="k">ADD COLUMN</span> ilot <span class="k">INTEGER</span>;
+
+<span class="k">UPDATE</span> cad.parcelles p
+<span class="k">SET</span> ilot = c.ilot
+<span class="k">FROM</span> (
+    <span class="k">SELECT</span> id,
+           ST_ClusterDBSCAN(geom, eps := 0.5, minpoints := 1) <span class="k">OVER</span> () + 1 <span class="k">AS</span> ilot
+    <span class="k">FROM</span> cad.parcelles
+) <span class="k">AS</span> c
+<span class="k">WHERE</span> c.id = p.id;
+
+<span class="k">CREATE TABLE</span> cad.ilots <span class="k">AS</span>
+<span class="k">SELECT</span> ilot                               <span class="k">AS</span> id,
+       COUNT(*)                           <span class="k">AS</span> nb_lots,
+       ROUND(SUM(ST_Area(geom))::numeric) <span class="k">AS</span> surface_m2,
+       ST_Multi(ST_Union(geom))::geometry(MultiPolygon, 32628) <span class="k">AS</span> geom   <span class="c">-- fusion</span>
+<span class="k">FROM</span> cad.parcelles
+<span class="k">GROUP BY</span> ilot;
+
+<span class="k">ALTER TABLE</span> cad.ilots ADD <span class="k">PRIMARY KEY</span> (id);
+<span class="k">CREATE INDEX</span> idx_ilots_geom <span class="k">ON</span> cad.ilots <span class="k">USING</span> GIST (geom);
+
+<span class="k">SELECT</span> COUNT(*) <span class="k">AS</span> nb_ilots, MAX(nb_lots) <span class="k">AS</span> plus_grand_ilot <span class="k">FROM</span> cad.ilots;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>nb_ilots</th><th>plus_grand_ilot</th></tr><tr><td>304</td><td>123</td></tr></table></div>
+<div class="astuce"><b>Fonctions de fenêtre</b><p><code>OVER ()</code> indique une fonction de fenêtre : elle calcule une valeur pour chaque ligne en regardant l'ensemble des lignes. <code>ST_Union</code>, utilisée avec <code>GROUP BY</code>, fusionne tous les lots d'un îlot en un seul polygone.</p></div>
+<h3>8.8 Détecter les lots qui se chevauchent</h3><pre><code><span class="k">SELECT</span> a.num_lot <span class="k">AS</span> lot_a,
+       b.num_lot <span class="k">AS</span> lot_b,
+       ROUND(ST_Area(ST_Intersection(a.geom, b.geom))::numeric, 2) <span class="k">AS</span> chevauchement_m2
+<span class="k">FROM</span> cad.parcelles a
+<span class="k">JOIN</span> cad.parcelles b <span class="k">ON</span> a.id &lt; b.id                       <span class="c">-- chaque paire une seule fois</span>
+                     <span class="k">AND</span> ST_Overlaps(a.geom, b.geom)
+                     <span class="k">AND</span> ST_Area(ST_Intersection(a.geom, b.geom)) &gt; 0.01
+<span class="k">ORDER BY</span> chevauchement_m2 <span class="k">DESC</span>
+<span class="k">LIMIT</span> 10;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>lot_a</th><th>lot_b</th><th>chevauchement_m2</th></tr><tr><td>NULL</td><td>NULL</td><td>16.68</td></tr><tr><td>NULL</td><td>NULL</td><td>2.49</td></tr><tr><td>LOT 31 H</td><td>NULL</td><td>1.94</td></tr><tr><td>LOT 32 E</td><td>NULL</td><td>1.66</td></tr><tr><td>LOT 32 G</td><td>NULL</td><td>0.63</td></tr><tr><td>4032</td><td>4034;4036</td><td>0.13</td></tr><tr><td>5086</td><td>4323</td><td>0.03</td></tr><tr><td>5006</td><td>5007</td><td>0.01</td></tr></table></div><p class="legende">Huit chevauchements réels. Le seuil de 0,01 m² écarte les contacts de quelques millimètres dus aux arrondis du dessin.</p>
+<div class="retenir"><b>Les relations spatiales</b><p><code>ST_Intersects</code> : au moins un point commun · <code>ST_Touches</code> : contact par le bord seulement · <code>ST_Overlaps</code> : recouvrement partiel · <code>ST_Contains / ST_Within</code> : l'un dans l'autre · <code>ST_DWithin(a, b, d)</code> : distance ≤ d.</p></div>
+</section><section class="chapitre" id="c9"><span class="num">Chapitre 9</span><h2>Contrôle qualité</h2><p class="duree">Séance 4 · 45 min</p><p>On regroupe tous les contrôles dans une <b>vue</b> : une requête enregistrée sous un nom, qui se recalcule à chaque lecture. <code>UNION ALL</code> empile les résultats de plusieurs requêtes qui ont les mêmes colonnes.</p><pre><code><span class="k">CREATE OR REPLACE VIEW</span> cad.v_anomalies <span class="k">AS</span>
+<span class="k">SELECT</span> ROW_NUMBER() <span class="k">OVER</span> () <span class="k">AS</span> gid, a.*      <span class="c">-- gid : clé unique pour QGIS</span>
+<span class="k">FROM</span> (
+<span class="k">SELECT</span> id, num_lot, 'numéro absent' <span class="k">AS</span> anomalie, geom
+<span class="k">FROM</span> cad.parcelles <span class="k">WHERE</span> num_lot <span class="k">IS</span> <span class="k">NULL</span>
+<span class="k">UNION ALL</span>
+<span class="k">SELECT</span> id, num_lot, 'numéro en double', geom
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> num_lot <span class="k">IN</span> (<span class="k">SELECT</span> num_lot <span class="k">FROM</span> cad.parcelles
+                  <span class="k">GROUP BY</span> num_lot <span class="k">HAVING</span> COUNT(*) &gt; 1)
+<span class="k">UNION ALL</span>
+<span class="k">SELECT</span> id, num_lot, 'lot très petit (&lt; 100 m²)', geom
+<span class="k">FROM</span> cad.parcelles <span class="k">WHERE</span> ST_Area(geom) &lt; 100
+<span class="k">UNION ALL</span>
+<span class="k">SELECT</span> a.id, a.num_lot, 'chevauche un autre lot', a.geom
+<span class="k">FROM</span> cad.parcelles a
+<span class="k">WHERE</span> <span class="k">EXISTS</span> (<span class="k">SELECT</span> 1 <span class="k">FROM</span> cad.parcelles b
+              <span class="k">WHERE</span> b.id &lt;&gt; a.id
+                <span class="k">AND</span> ST_Overlaps(a.geom, b.geom)
+                <span class="k">AND</span> ST_Area(ST_Intersection(a.geom, b.geom)) &gt; 0.01)
+<span class="k">UNION ALL</span>
+<span class="k">SELECT</span> id, num_lot, 'géométrie invalide', geom
+<span class="k">FROM</span> cad.parcelles <span class="k">WHERE</span> <span class="k">NOT</span> ST_IsValid(geom)
+) <span class="k">AS</span> a;
+
+<span class="k">SELECT</span> anomalie, COUNT(*) <span class="k">AS</span> nombre
+<span class="k">FROM</span> cad.v_anomalies
+<span class="k">GROUP BY</span> anomalie
+<span class="k">ORDER BY</span> nombre <span class="k">DESC</span>;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>anomalie</th><th>nombre</th></tr><tr><td>numéro en double</td><td>392</td></tr><tr><td>numéro absent</td><td>211</td></tr><tr><td>lot très petit (&lt; 100 m²)</td><td>32</td></tr><tr><td>chevauche un autre lot</td><td>13</td></tr></table></div><p class="legende">Aucune géométrie invalide : le nettoyage dans QGIS a été efficace. Les 211 lots sans numéro (et non plus 257) s'expliquent par les 46 débris supprimés au chapitre 6.</p>
+<div class="note"><b>Que faire des anomalies ?</b><p>La base ne décide pas : elle signale. Les numéros en double et les chevauchements se corrigent avec le service technique, en revenant au plan approuvé. Une fois les doublons réglés, la contrainte <code>UNIQUE (num_lot)</code> du chapitre 6 pourra être ajoutée et protégera la base pour toujours.</p></div>
+</section><section class="chapitre" id="c10"><span class="num">Chapitre 10</span><h2>Vues, QGIS, copie étudiante, droits et sauvegarde</h2><p class="duree">Séance 4 · 1 h</p><h3>10.1 Une vue de synthèse par îlot</h3><pre><code><span class="k">CREATE OR REPLACE VIEW</span> cad.v_ilots_occupation <span class="k">AS</span>
+<span class="k">SELECT</span> i.id,
+       i.nb_lots,
+       COUNT(p.proprietaire_id)                            <span class="k">AS</span> lots_attribues,
+       ROUND(100.0 * COUNT(p.proprietaire_id) / i.nb_lots) <span class="k">AS</span> taux_pct,
+       i.geom
+<span class="k">FROM</span> cad.ilots i
+<span class="k">JOIN</span> cad.parcelles p <span class="k">ON</span> p.ilot = i.id
+<span class="k">GROUP BY</span> i.id, i.nb_lots, i.geom;
+
+<span class="k">SELECT</span> <span class="k">CASE</span> <span class="k">WHEN</span> taux_pct = 100 <span class="k">THEN</span> 'complet'
+            <span class="k">WHEN</span> taux_pct = 0   <span class="k">THEN</span> 'vide'
+            <span class="k">ELSE</span> 'partiel' <span class="k">END</span> <span class="k">AS</span> etat,
+       COUNT(*) <span class="k">AS</span> nb_ilots
+<span class="k">FROM</span> cad.v_ilots_occupation
+<span class="k">GROUP BY</span> etat <span class="k">ORDER BY</span> etat;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>etat</th><th>nb_ilots</th></tr><tr><td>complet</td><td>125</td></tr><tr><td>partiel</td><td>119</td></tr><tr><td>vide</td><td>60</td></tr></table></div>
+<div class="piege"><b>Diviser des entiers</b><p><code>100 * 3 / 4</code> donne 75, mais <code>3 / 4</code> donne 0 : la division de deux entiers est entière. Écrire <code>100.0</code> force un calcul décimal.</p></div>
+
+<h3>10.2 Afficher les résultats dans QGIS</h3>
+<ol>
+  <li>Panneau <b>Explorateur &gt; PostgreSQL</b> : clic droit &gt; <i>Nouvelle connexion</i>. Hôte <code>localhost</code>, port <code>5432</code>, base <code>Malicounda_EST</code>.</li>
+  <li>Déplier la connexion puis le schéma <code>cad</code> et glisser sur la carte <code>parcelles</code>, <code>ilots</code>, <code>v_anomalies</code> et <code>v_ilots_occupation</code>.</li>
+  <li>Pour une vue, QGIS demande une colonne identifiant unique : choisir <code>gid</code> pour <code>v_anomalies</code>, <code>id</code> pour <code>v_ilots_occupation</code>.</li>
+  <li>Symboliser <code>v_anomalies</code> par catégories sur le champ <code>anomalie</code>, et <code>v_ilots_occupation</code> en dégradé sur <code>taux_pct</code>.</li>
+</ol>
+<p>Une vue est toujours à jour : corriger un numéro dans <code>cad.parcelles</code>, puis actualiser la carte, fait disparaître l'anomalie correspondante.</p>
+<h3>10.3 Une copie anonymisée pour les étudiants</h3><pre><code><span class="k">CREATE SCHEMA</span> <span class="k">IF NOT EXISTS</span> formation;
+
+<span class="k">CREATE TABLE</span> formation.parcelles <span class="k">AS</span>
+<span class="k">SELECT</span> p.id, p.num_lot, p.superficie, p.ilot, p.proprietaire_id,
+       <span class="k">CASE</span> <span class="k">WHEN</span> p.proprietaire_id <span class="k">IS</span> <span class="k">NULL</span> <span class="k">THEN</span> <span class="k">NULL</span>
+            <span class="k">ELSE</span> 'Propriétaire ' || LPAD(p.proprietaire_id::text, 4, '0')
+       <span class="k">END</span> <span class="k">AS</span> proprietaire,                       <span class="c">-- ex. « Propriétaire 0240 »</span>
+       p.geom
+<span class="k">FROM</span> cad.parcelles p;
+
+<span class="k">ALTER TABLE</span> formation.parcelles ADD <span class="k">PRIMARY KEY</span> (id);
+<span class="k">CREATE INDEX</span> <span class="k">ON</span> formation.parcelles <span class="k">USING</span> GIST (geom);</code></pre>
+<p>Les étudiants gardent toutes les possibilités d'analyse (qui possède plusieurs lots, taux d'occupation…) sans jamais voir un nom réel.</p><h3>10.4 Un compte étudiant en lecture seule</h3><pre><code><span class="k">CREATE ROLE</span> etudiant <span class="k">LOGIN</span> <span class="k">PASSWORD</span> 'choisir_un_vrai_mot_de_passe';
+<span class="k">GRANT</span> CONNECT <span class="k">ON</span> DATABASE "Malicounda_EST" <span class="k">TO</span> etudiant;
+<span class="k">GRANT</span> USAGE  <span class="k">ON</span> <span class="k">SCHEMA</span> formation <span class="k">TO</span> etudiant;
+<span class="k">GRANT</span> <span class="k">SELECT</span> <span class="k">ON</span> ALL TABLES <span class="k">IN</span> <span class="k">SCHEMA</span> formation <span class="k">TO</span> etudiant;     <span class="c">-- lire, pas modifier</span></code></pre>
+<div class="retenir"><b>Bonnes pratiques</b><p>Ne jamais donner le compte <code>postgres</code> (super-utilisateur) aux étudiants. Le rôle <code>etudiant</code> ne voit que le schéma <code>formation</code> et ne peut rien modifier ni supprimer.</p></div>
+<h3>10.5 Sauvegarder et restaurer la base</h3><p>Dans pgAdmin : clic droit sur <b>Malicounda_EST &gt; Backup…</b>, format <b>Custom</b>. En ligne de commande :</p><pre class="shell"><code>cd "C:\Program Files\PostgreSQL\18\bin"
+pg_dump -U postgres -d Malicounda_EST -F c -f C:\cours\malicounda_est.backup
+
+:: restaurer dans une base vide nommée Malicounda_EST_test
+createdb -U postgres Malicounda_EST_test
+pg_restore -U postgres -d Malicounda_EST_test C:\cours\malicounda_est.backup</code></pre>
+<p>Une sauvegarde n'est fiable que si l'on a déjà réussi à la restaurer : faire l'essai une fois en séance.</p></section><section class="chapitre" id="c11"><span class="num">Chapitre 11</span><h2>Exercices corrigés</h2><p class="duree">Séance 4 · 1 h 15 (ou en autonomie)</p><p>Les exercices s'appuient sur les tables créées aux chapitres 4 à 8. Les corrigés se déplient en cliquant ; ils sont tous ouverts dans la version PDF.</p><h3>Niveau 1 : lire et filtrer</h3><div class="exo"><b>Exercice 1.</b> Combien de lots ont exactement la superficie standard de 300 m² ?<details><summary>Voir le corrigé</summary><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> cad.parcelles <span class="k">WHERE</span> superficie = 300;</code></pre>
+<p class="legende">Résultat : 1311.</p></details></div>
+<div class="exo"><b>Exercice 2.</b> Afficher le numéro et la superficie des trois plus grands lots.<details><summary>Voir le corrigé</summary><pre><code><span class="k">SELECT</span> num_lot, superficie
+<span class="k">FROM</span> cad.parcelles
+<span class="k">ORDER BY</span> superficie <span class="k">DESC</span>
+<span class="k">LIMIT</span> 3;</code></pre>
+<p class="legende">18 543 m² (sans numéro), 17 088 m² (lot 2944), 13 842 m² (sans numéro).</p></details></div>
+<div class="exo"><b>Exercice 3.</b> Combien de lots à l'ancienne numérotation (« LOT … ») n'ont pas de propriétaire ?<details><summary>Voir le corrigé</summary><pre><code><span class="k">SELECT</span> COUNT(*)
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> num_lot <span class="k">ILIKE</span> 'LOT%'
+  <span class="k">AND</span> proprietaire_id <span class="k">IS</span> <span class="k">NULL</span>;</code></pre>
+<p class="legende">Résultat : 42.</p></details></div>
+<h3>Niveau 2 : regrouper</h3><div class="exo"><b>Exercice 4.</b> Calculer la superficie moyenne par type de numéro (colonne <code>type_numero</code>).<details><summary>Voir le corrigé</summary><pre><code><span class="k">SELECT</span> type_numero, ROUND(AVG(superficie)) <span class="k">AS</span> moyenne_m2
+<span class="k">FROM</span> cad.parcelles
+<span class="k">GROUP BY</span> type_numero
+<span class="k">ORDER BY</span> moyenne_m2 <span class="k">DESC</span>;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>type_numero</th><th>moyenne_m2</th></tr><tr><td>absent</td><td>684</td></tr><tr><td>multiple</td><td>526</td></tr><tr><td>avec suffixe</td><td>471</td></tr><tr><td>numerique</td><td>311</td></tr><tr><td>ancien (LOT)</td><td>306</td></tr></table></div>
+</details></div>
+<div class="exo"><b>Exercice 5.</b> Quels sont les cinq îlots qui comptent le plus de lots sans numéro ?<details><summary>Voir le corrigé</summary><pre><code><span class="k">SELECT</span> ilot, COUNT(*) <span class="k">AS</span> sans_numero
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> num_lot <span class="k">IS</span> <span class="k">NULL</span>
+<span class="k">GROUP BY</span> ilot
+<span class="k">ORDER BY</span> sans_numero <span class="k">DESC</span>
+<span class="k">LIMIT</span> 5;</code></pre>
+<p class="legende">L'îlot 93 arrive en tête avec 18 lots sans numéro.</p></details></div>
+<div class="exo"><b>Exercice 6.</b> Les lots multiples comme <code>2228;2230</code> regroupent plusieurs numéros. Combien de numéros individuels contiennent-ils au total ?<details><summary>Voir le corrigé</summary><pre><code><span class="k">SELECT</span> COUNT(*)
+<span class="k">FROM</span> (
+    <span class="k">SELECT</span> id, UNNEST(STRING_TO_ARRAY(num_lot, ';')) <span class="k">AS</span> numero
+    <span class="k">FROM</span> cad.parcelles
+    <span class="k">WHERE</span> num_lot <span class="k">LIKE</span> '%;%'
+) <span class="k">AS</span> t;</code></pre>
+<p class="legende">Résultat : 108. <code>STRING_TO_ARRAY</code> découpe le texte en liste, <code>UNNEST</code> transforme la liste en lignes.</p></details></div>
+<h3>Niveau 3 : spatial</h3><div class="exo"><b>Exercice 7.</b> Combien de lots ont un périmètre supérieur à 100 m ?<details><summary>Voir le corrigé</summary><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> cad.parcelles <span class="k">WHERE</span> ST_Perimeter(geom) &gt; 100;</code></pre>
+<p class="legende">Résultat : 67.</p></details></div>
+<div class="exo"><b>Exercice 8.</b> Combien de voisins (lots qui le touchent) a le lot 3709 ?<details><summary>Voir le corrigé</summary><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">AS</span> nb_voisins
+<span class="k">FROM</span> cad.parcelles p
+<span class="k">JOIN</span> cad.parcelles v <span class="k">ON</span> ST_Touches(p.geom, v.geom)
+<span class="k">WHERE</span> p.num_lot = '3709';</code></pre>
+<p class="legende">Résultat : 3.</p></details></div>
+<div class="exo"><b>Exercice 9.</b> Quelle distance sépare le lot 3710 du lot 2944 ?<details><summary>Voir le corrigé</summary><pre><code><span class="k">SELECT</span> ROUND(ST_Distance(a.geom, b.geom)::numeric, 1) <span class="k">AS</span> distance_m
+<span class="k">FROM</span> cad.parcelles a, cad.parcelles b
+<span class="k">WHERE</span> a.num_lot = '3710' <span class="k">AND</span> b.num_lot = '2944';</code></pre>
+<p class="legende">Résultat : 287,9 m (distance entre les bords les plus proches).</p></details></div>
+<div class="exo"><b>Exercice 10.</b> Combien de lots libres (sans propriétaire) touchent au moins un lot attribué ?<details><summary>Voir le corrigé</summary><pre><code><span class="k">SELECT</span> COUNT(*)
+<span class="k">FROM</span> cad.parcelles p
+<span class="k">WHERE</span> p.proprietaire_id <span class="k">IS</span> <span class="k">NULL</span>
+  <span class="k">AND</span> <span class="k">EXISTS</span> (<span class="k">SELECT</span> 1 <span class="k">FROM</span> cad.parcelles v
+              <span class="k">WHERE</span> v.proprietaire_id <span class="k">IS</span> <span class="k">NOT</span> <span class="k">NULL</span>
+                <span class="k">AND</span> ST_Touches(p.geom, v.geom));</code></pre>
+<p class="legende">Résultat : 306.</p></details></div>
+<h3>Niveau 4 : modifier et synthétiser</h3><div class="exo"><b>Exercice 11.</b> Remplacer le code « 7 » de la colonne <code>commune</code> par « MALICOUNDA », dans une transaction, vérifier, puis annuler.<details><summary>Voir le corrigé</summary><pre><code><span class="k">BEGIN</span>;
+<span class="k">UPDATE</span> cad.parcelles <span class="k">SET</span> commune = 'MALICOUNDA' <span class="k">WHERE</span> commune = '7';   <span class="c">-- UPDATE 3074</span>
+<span class="k">SELECT</span> <span class="k">DISTINCT</span> commune <span class="k">FROM</span> cad.parcelles;                          <span class="c">-- MALICOUNDA</span>
+<span class="k">ROLLBACK</span>;                                                            <span class="c">-- tout est annulé</span></code></pre>
+<p class="legende">Le nom exact de la commune et du village est à confirmer avec le service avant un <code>COMMIT</code>.</p></details></div>
+<div class="exo"><b>Exercice 12.</b> Donner la position GPS (longitude, latitude) du centre du lotissement.<details><summary>Voir le corrigé</summary><pre><code><span class="k">SELECT</span> ROUND(ST_X(ST_Transform(ST_Centroid(ST_Collect(geom)), 4326))::numeric, 5) <span class="k">AS</span> lon,
+       ROUND(ST_Y(ST_Transform(ST_Centroid(ST_Collect(geom)), 4326))::numeric, 5) <span class="k">AS</span> lat
+<span class="k">FROM</span> cad.parcelles;</code></pre>
+<p class="legende">Résultat : -16.95806, 14.45632. <code>ST_Collect</code> rassemble tous les lots en une seule géométrie dont on prend le centre.</p></details></div>
+<div class="exo"><b>Exercice 13.</b> Combien d'îlots comptent au moins 20 lots ?<details><summary>Voir le corrigé</summary><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> cad.ilots <span class="k">WHERE</span> nb_lots &gt;= 20;</code></pre>
+<p class="legende">Résultat : 10.</p></details></div>
+<div class="exo"><b>Exercice 14.</b> Créer une vue <code>cad.v_lots_libres</code> qui affiche, pour chaque lot sans propriétaire, son identifiant, son numéro, sa superficie, son îlot et sa géométrie. L'afficher dans QGIS.<details><summary>Voir le corrigé</summary><pre><code><span class="k">CREATE OR REPLACE VIEW</span> cad.v_lots_libres <span class="k">AS</span>
+<span class="k">SELECT</span> id, num_lot, superficie, ilot, geom
+<span class="k">FROM</span> cad.parcelles
+<span class="k">WHERE</span> proprietaire_id <span class="k">IS</span> <span class="k">NULL</span>;
+
+<span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> cad.v_lots_libres;</code></pre>
+<p class="legende">Résultat : 736 lots libres (3 074 lots moins 2 338 attribués).</p></details></div>
+</section><section class="chapitre" id="annexe"><span class="num">Annexes</span><h2>Erreurs fréquentes et aide-mémoire</h2><h3>A.1 Erreurs fréquentes</h3><div class="tablewrap"><table class="resultat"><tr><th>Message</th><th>Cause</th><th>Solution</th></tr><tr><td>function addgeometrycolumn(...) does not exist</td><td>PostGIS non activé dans la base</td><td>CREATE EXTENSION postgis; puis relancer le dump</td></tr><tr><td>type &quot;geometry&quot; does not exist</td><td>Même cause, ou mauvaise base sélectionnée</td><td>Vérifier la base en haut de l&#x27;outil de requête</td></tr><tr><td>relation &quot;malicouda est&quot; does not exist</td><td>Table déplacée dans brut, ou guillemets oubliés</td><td>brut.lots_qgis, ou &quot;nom avec espace&quot;</td></tr><tr><td>syntax error at or near &quot;°&quot;</td><td>Nom de colonne spécial sans guillemets doubles</td><td>&quot;n° du lot&quot;</td></tr><tr><td>column &quot;3710&quot; does not exist</td><td>Valeur écrite entre guillemets doubles</td><td>&#x27;3710&#x27; (guillemets simples)</td></tr><tr><td>Column has Z dimension but geometry does not</td><td>Insertion d&#x27;une géométrie 3D dans une colonne 2D</td><td>ST_Force2D(geom)</td></tr><tr><td>column reference &quot;id&quot; is ambiguous</td><td>Colonne présente dans les deux tables d&#x27;une jointure</td><td>Préfixer : p.id, pr.id</td></tr><tr><td>must appear in the GROUP BY clause</td><td>Colonne affichée sans être regroupée ni agrégée</td><td>L&#x27;ajouter au GROUP BY ou utiliser COUNT, SUM…</td></tr><tr><td>current transaction is aborted</td><td>Une erreur s&#x27;est produite après BEGIN</td><td>ROLLBACK; puis corriger et recommencer</td></tr><tr><td>Caractères « Â° » à la place de « ° »</td><td>Encodage de la console Windows</td><td>chcp 65001 et PGCLIENTENCODING=UTF8</td></tr></table></div>
+<h3>A.2 Aide-mémoire SQL</h3><div class="tablewrap"><table class="resultat"><tr><th>Besoin</th><th>Syntaxe</th></tr><tr><td>Lire</td><td>SELECT col1, col2 FROM schema.table WHERE … ORDER BY … LIMIT n;</td></tr><tr><td>Compter / résumer</td><td>COUNT(*), COUNT(col), SUM, AVG, MIN, MAX, COUNT(DISTINCT col)</td></tr><tr><td>Regrouper</td><td>GROUP BY col HAVING COUNT(*) &gt; 1</td></tr><tr><td>Texte</td><td>LIKE &#x27;LOT%&#x27;, ILIKE, UPPER, TRIM, LENGTH, SPLIT_PART, CONCAT_WS, ~ (regex)</td></tr><tr><td>Valeur absente</td><td>IS NULL, IS NOT NULL, COALESCE(x, 0), NULLIF(x, &#x27;&#x27;)</td></tr><tr><td>Conditions</td><td>CASE WHEN … THEN … ELSE … END</td></tr><tr><td>Créer / modifier</td><td>CREATE TABLE, ALTER TABLE … ADD COLUMN, INSERT … SELECT, UPDATE … SET … WHERE, DELETE … WHERE</td></tr><tr><td>Sécurité</td><td>BEGIN; … COMMIT; ou ROLLBACK;</td></tr><tr><td>Jointures</td><td>JOIN … ON a.cle = b.cle, LEFT JOIN, jointure spatiale ON ST_Touches(a.geom, b.geom)</td></tr><tr><td>Vue</td><td>CREATE OR REPLACE VIEW schema.v_nom AS SELECT …</td></tr></table></div>
+<h3>A.3 Aide-mémoire PostGIS</h3><div class="tablewrap"><table class="resultat"><tr><th>Fonction</th><th>Rôle</th></tr><tr><td>ST_Area, ST_Perimeter, ST_Length</td><td>mesures (en mètres en EPSG:32628)</td></tr><tr><td>ST_Distance, ST_DWithin</td><td>distance ; filtre « à moins de d mètres » (utilise l&#x27;index)</td></tr><tr><td>ST_Touches, ST_Intersects, ST_Overlaps, ST_Contains</td><td>relations entre géométries</td></tr><tr><td>ST_Intersection, ST_Union, ST_Buffer</td><td>construire de nouvelles géométries</td></tr><tr><td>ST_PointOnSurface, ST_Centroid, ST_X, ST_Y</td><td>points représentatifs et coordonnées</td></tr><tr><td>ST_SetSRID, ST_Transform</td><td>étiqueter un SRID ; reprojeter (ex. vers 4326)</td></tr><tr><td>ST_Force2D, ST_Multi, ST_IsValid, ST_MakeValid</td><td>normaliser et contrôler</td></tr><tr><td>ST_ClusterDBSCAN … OVER ()</td><td>regrouper les géométries proches (îlots)</td></tr><tr><td>geom &lt;-&gt; pt</td><td>tri par proximité (plus proches voisins)</td></tr></table></div>
+</section>
+</div>
+<script>window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));</script>
+</body>
+</html>
