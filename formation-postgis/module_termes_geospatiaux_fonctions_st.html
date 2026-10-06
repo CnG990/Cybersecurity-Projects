@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Termes géospatiaux et fonctions ST_</title>
+<style>
+  :root{
+    --encre:#12355B;      /* bleu de plan */
+    --encre-clair:#E8EEF5;
+    --terrain:#2F6B4F;    /* vert topographique */
+    --terrain-clair:#E6F1EB;
+    --alerte:#B3261E;
+    --alerte-clair:#FBEAE8;
+    --jalon:#8A5A00;      /* ocre de jalon */
+    --jalon-clair:#FFF4D6;
+    --texte:#1B1F24;
+    --gris:#5B6570;
+    --trait:#C9D2DC;
+    --code-fond:#F4F6F8;
+  }
+  *{box-sizing:border-box}
+  html{font-size:16px}
+  body{
+    margin:0; background:#fff; color:var(--texte);
+    font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;
+    line-height:1.6;
+  }
+  .page{max-width:820px; margin:0 auto; padding:24px 28px 80px}
+  h1,h2,h3,h4{font-family:Georgia,"Times New Roman",serif; color:var(--encre); line-height:1.25}
+  h2{font-size:1.75rem; margin:0 0 .6em; padding-bottom:.35em; border-bottom:3px solid var(--encre)}
+  h3{font-size:1.2rem; margin:1.8em 0 .5em}
+  h4{font-size:1rem; margin:1.4em 0 .4em; color:var(--terrain)}
+  p{margin:.6em 0}
+  ul,ol{padding-left:1.4em}
+  li{margin:.25em 0}
+  a{color:var(--encre)}
+  code{font-family:Consolas,"Courier New",monospace; font-size:.9em; background:var(--code-fond); padding:.08em .3em; border-radius:3px}
+  pre{
+    background:var(--code-fond); border:1px solid var(--trait); border-left:4px solid var(--encre);
+    padding:12px 14px; margin:.9em 0; overflow-x:auto; border-radius:0 4px 4px 0;
+    font-family:Consolas,"Courier New",monospace; font-size:.82rem; line-height:1.5;
+    white-space:pre-wrap; word-break:break-word;
+  }
+  pre code{background:none; padding:0; font-size:inherit}
+  pre.shell{border-left-color:var(--terrain)}
+  .c{color:#6B7682; font-style:italic}       /* commentaire */
+  .k{color:#12355B; font-weight:700}          /* mot-clé */
+  .legende{font-size:.82rem; color:var(--gris); margin-top:-.4em}
+
+  /* Couverture */
+  .couverture{
+    min-height:92vh; display:flex; flex-direction:column; justify-content:space-between;
+    border:2px solid var(--encre); padding:40px 36px; margin-bottom:40px; position:relative;
+    background:
+      linear-gradient(var(--encre-clair) 1px, transparent 1px) 0 0/100% 28px,
+      linear-gradient(90deg, var(--encre-clair) 1px, transparent 1px) 0 0/28px 100%;
+  }
+  .couverture .bloc{background:#fff; padding:22px 24px; border:1px solid var(--encre)}
+  .couverture h1{font-size:2.5rem; margin:0 0 .3em}
+  .couverture .sous{font-size:1.15rem; color:var(--gris); margin:0}
+  .cartouche{display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--encre); background:#fff; font-size:.9rem}
+  .cartouche div{padding:8px 12px; border-bottom:1px solid var(--trait)}
+  .cartouche div:nth-child(odd){border-right:1px solid var(--trait)}
+  .cartouche b{display:block; color:var(--encre); font-size:.78rem; font-weight:600}
+
+  /* Chaîne de traitement */
+  .chaine{display:flex; flex-wrap:wrap; gap:6px; margin:1em 0; align-items:stretch}
+  .chaine .etape{flex:1 1 120px; border:1.5px solid var(--encre); padding:8px 10px; font-size:.82rem; background:#fff}
+  .chaine .etape b{display:block; color:var(--encre); font-size:.92rem}
+  .chaine .fl{align-self:center; color:var(--encre); font-weight:700}
+
+  /* Encadrés */
+  .note,.piege,.astuce,.retenir{padding:10px 14px; margin:1em 0; border-left:5px solid; font-size:.94rem}
+  .note{background:var(--encre-clair); border-color:var(--encre)}
+  .piege{background:var(--alerte-clair); border-color:var(--alerte)}
+  .astuce{background:var(--terrain-clair); border-color:var(--terrain)}
+  .retenir{background:var(--jalon-clair); border-color:var(--jalon)}
+  .note>b:first-child,.piege>b:first-child,.astuce>b:first-child,.retenir>b:first-child{display:block; margin-bottom:.2em}
+  .piege>b:first-child{color:var(--alerte)} .astuce>b:first-child{color:var(--terrain)}
+  .retenir>b:first-child{color:var(--jalon)} .note>b:first-child{color:var(--encre)}
+
+  table{border-collapse:collapse; width:100%; margin:1em 0; font-size:.88rem}
+  th,td{border:1px solid var(--trait); padding:6px 9px; text-align:left; vertical-align:top}
+  th{background:var(--encre); color:#fff; font-weight:600}
+  tr:nth-child(even) td{background:#FAFBFC}
+  .tablewrap{overflow-x:auto}
+
+  section.chapitre{margin-top:56px}
+  .num{font-family:Georgia,serif; color:var(--terrain); font-size:.95rem; font-weight:700; display:block; margin-bottom:.2em}
+  .duree{font-size:.85rem; color:var(--gris); margin:-.3em 0 1em}
+
+  .sommaire ol{list-style:none; padding:0; margin:0}
+  .sommaire li{display:flex; gap:10px; padding:6px 0; border-bottom:1px dotted var(--trait)}
+  .sommaire li span:first-child{color:var(--terrain); font-weight:700; min-width:2.2em}
+  .sommaire a{text-decoration:none; color:var(--texte)}
+  .sommaire a:hover{text-decoration:underline}
+
+  .exo{border:1.5px solid var(--terrain); padding:10px 14px; margin:1em 0}
+  .exo>b:first-child{color:var(--terrain)}
+
+  .barre{position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid var(--trait); padding:8px 28px; display:flex; justify-content:space-between; align-items:center; font-size:.88rem; gap:12px}
+  .barre button{background:var(--encre); color:#fff; border:0; padding:8px 14px; font-size:.88rem; cursor:pointer; border-radius:3px}
+  .barre button:focus-visible, a:focus-visible{outline:3px solid var(--jalon); outline-offset:2px}
+
+  /* ----------- Impression / PDF ----------- */
+  @page{size:A4; margin:18mm 16mm 18mm 16mm}
+  @media print{
+    html{font-size:11pt}
+    .barre{display:none}
+    .page{max-width:none; padding:0}
+    .couverture{min-height:250mm; page-break-after:always; margin:0}
+    .sommaire{page-break-after:always}
+    section.chapitre{page-break-before:always; margin-top:0}
+    pre,table,.note,.piege,.astuce,.retenir,.exo,.chaine{page-break-inside:avoid; break-inside:avoid}
+    h2,h3,h4{page-break-after:avoid; break-after:avoid}
+    pre{font-size:8.6pt}
+    a{text-decoration:none; color:inherit}
+    *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  }
+
+  details{margin:.6em 0 .2em}
+  details summary{cursor:pointer; color:var(--terrain); font-weight:600; font-size:.9rem}
+  table.resultat{width:auto; min-width:40%}
+  table.resultat td{font-family:Consolas,"Courier New",monospace; font-size:.82rem}
+  @media (max-width:600px){ .page{padding:16px 16px 60px} .barre{padding:8px 16px} .couverture{padding:20px 16px} .cartouche{grid-template-columns:1fr} .couverture h1{font-size:1.8rem} }
+  @media print{ details summary{display:none} .tablewrap{overflow:visible} }
+
+  .terme{display:grid; grid-template-columns:190px 1fr; gap:14px; padding:10px 0; border-bottom:1px dotted var(--trait); font-size:.94rem}
+  .t-nom{font-weight:700; color:var(--encre)}
+  .t-en{display:block; font-weight:400; font-style:italic; color:var(--gris); font-size:.82rem}
+  .t-ex{color:var(--terrain)}
+  .fn{font-size:.85rem; color:var(--gris)}
+  .fiche{border:1px solid var(--trait); border-left:4px solid var(--terrain); padding:8px 12px; margin:.6em 0; font-size:.92rem; break-inside:avoid}
+  .f-nom{font-weight:700; color:var(--encre); font-family:Consolas,"Courier New",monospace}
+  .f-ret{font-size:.85rem; color:var(--gris)}
+  figure.schema{margin:1.2em 0; text-align:center; break-inside:avoid}
+  figure.schema svg{width:100%; max-width:640px; height:auto}
+  figure.schema figcaption{font-size:.82rem; color:var(--gris); margin-top:.3em}
+  @media (max-width:600px){ .terme{grid-template-columns:1fr; gap:2px} }
+</style>
+
+</head>
+<body>
+
+<div class="barre">
+  <span>Module : les termes géospatiaux et les fonctions ST_</span>
+  <button onclick="window.print()">Enregistrer en PDF</button>
+</div>
+<div class="page">
+<header class="couverture">
+  <div class="bloc">
+    <h1>Les termes géospatiaux et les fonctions ST_</h1>
+    <p class="sous">Comprendre le vocabulaire des SIG, puis les fonctions PostGIS qui le mettent en pratique, sur le lotissement de Malicounda Est</p>
+  </div>
+  <div class="cartouche">
+    <div><b>Public</b>Débutants ayant suivi le Module 1 (types de données)</div>
+    <div><b>Durée indicative</b>2 séances de 3 heures</div>
+    <div><b>Prérequis</b>Table <code>"malicouda est"</code> importée dans <code>Malicounda_EST</code></div>
+    <div><b>Logiciels</b>PostgreSQL 18 + PostGIS, pgAdmin 4</div>
+    <div><b>Organisation</b>Partie 1 : les mots (sans code) · Partie 2 : les fonctions ST_</div>
+    <div><b>Formateur</b>Cheikh NGOM</div>
+  </div>
+</header>
+
+<nav class="sommaire" aria-label="Sommaire">
+  <h2>Sommaire</h2>
+  <ol>
+    <li><span></span><b>Partie 1 : les mots du géospatial</b></li>
+    <li><span>1</span><a href="#s1">Donnée géographique, entité, attribut, géométrie</a></li>
+    <li><span>2</span><a href="#s2">Anatomie d'une géométrie</a></li>
+    <li><span>3</span><a href="#s3">Se repérer sur la Terre : coordonnées, projection, SRID</a></li>
+    <li><span>4</span><a href="#s4">Relations entre objets : la topologie</a></li>
+    <li><span>5</span><a href="#s5">Formes calculées : centroïde, emprise, tampon…</a></li>
+    <li><span>6</span><a href="#s6">Les formats : WKT, WKB, GeoJSON, shapefile…</a></li>
+    <li><span></span><b>Partie 2 : les fonctions ST_</b></li>
+    <li><span>7</span><a href="#s7">Que veut dire « ST_ » ?</a></li>
+    <li><span>8</span><a href="#s8">Construire une géométrie</a></li>
+    <li><span>9</span><a href="#s9">Décrire une géométrie</a></li>
+    <li><span>10</span><a href="#s10">Mesurer</a></li>
+    <li><span>11</span><a href="#s11">Tester une relation (vrai / faux)</a></li>
+    <li><span>12</span><a href="#s12">Fabriquer de nouvelles formes</a></li>
+    <li><span>13</span><a href="#s13">Changer de système de coordonnées</a></li>
+    <li><span>14</span><a href="#s14">Contrôler la qualité</a></li>
+    <li><span>15</span><a href="#s15">Exercices de synthèse</a></li>
+    <li><span>A</span><a href="#s16">Lexique récapitulatif</a></li>
+  </ol>
+</nav>
+<section class="chapitre" id="s1"><span class="num">Partie 1 · Chapitre 1</span><h2>Donnée géographique, entité, attribut, géométrie</h2><p class="duree">Séance 1 · 20 min</p><div class="retenir"><b>Objectif</b><p>Savoir nommer les éléments d'une donnée géographique.</p></div>
+<p>Une <b>donnée géographique</b> est une information qui a une <b>position sur la Terre</b>. Le plan de Malicounda Est en est une : chaque lot a une forme et un emplacement.</p><div class="terme"><div class="t-nom">SIG<span class="t-en">GIS</span></div><div class="t-def">Système d'Information Géographique : ensemble d'outils pour stocker, analyser et afficher des données géographiques.<br><span class="t-ex">À Malicounda : QGIS (affichage, édition) + PostgreSQL/PostGIS (stockage, requêtes).</span></div></div>
+<div class="terme"><div class="t-nom">Entité<span class="t-en">feature</span></div><div class="t-def">Un objet du monde réel représenté dans le SIG.<br><span class="t-ex">À Malicounda : un lot. La table <code>"malicouda est"</code> contient 3 120 entités.</span></div></div>
+<div class="terme"><div class="t-nom">Attribut<span class="t-en">attribute</span></div><div class="t-def">Une information descriptive sur l'entité, rangée dans une colonne.<br><span class="t-ex">À Malicounda : <code>"n° du lot"</code>, <code>superficie</code>, <code>prenom</code>, <code>nom</code>.</span></div></div>
+<div class="terme"><div class="t-nom">Géométrie<span class="t-en">geometry</span></div><div class="t-def">La forme et la position de l'entité, rangée dans une colonne de type <code>geometry</code>.<br><span class="t-ex">À Malicounda : la colonne <code>wkb_geometry</code>.</span><br><span class="fn">PostGIS : <code>GeometryType(), ST_AsText()</code></span></div></div>
+<div class="terme"><div class="t-nom">Couche<span class="t-en">layer</span></div><div class="t-def">Un ensemble d'entités de même nature. Dans PostGIS, une couche = une table avec une colonne géométrique.<br><span class="t-ex">À Malicounda : la couche des lots ; on pourrait ajouter une couche des voies, une couche des bornes.</span></div></div>
+<div class="terme"><div class="t-nom">Vecteur / raster<span class="t-en">vector / raster</span></div><div class="t-def"><b>Vecteur</b> : des formes décrites par des coordonnées (points, lignes, polygones). <b>Raster</b> : une image faite de pixels (photo aérienne, image satellite).<br><span class="t-ex">À Malicounda : le plan des lots est vectoriel ; une orthophoto de Malicounda serait un raster. Ce cours ne traite que le vecteur.</span></div></div>
+</section><section class="chapitre" id="s2"><span class="num">Partie 1 · Chapitre 2</span><h2>Anatomie d'une géométrie</h2><p class="duree">Séance 1 · 25 min</p><div class="retenir"><b>Objectif</b><p>Connaître les mots qui décrivent une forme.</p></div>
+<figure class="schema"><svg viewBox="0 0 640 170" role="img" aria-label="Un polygone (à gauche) avec ses sommets, ses segments, son contour et son intérieur ; un point et une ligne (à droite)."><polygon points="80,140 260,140 260,30 80,30" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><circle cx="80" cy="140" r="6" fill="var(--alerte)"/><circle cx="260" cy="140" r="6" fill="var(--alerte)"/><circle cx="260" cy="30" r="6" fill="var(--alerte)"/><circle cx="80" cy="30" r="6" fill="var(--alerte)"/><text x="170" y="90" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle">intérieur</text><text x="170" y="160" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle">segment</text><text x="300" y="34" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="start">sommet (vertex)</text><line x1="296" y1="30" x2="268" y2="30" stroke="var(--gris)"/><text x="300" y="94" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="start">contour = limite</text><line x1="296" y1="90" x2="262" y2="90" stroke="var(--gris)"/><text x="60" y="160" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5" fill="var(--gris)">1er = dernier point</text><circle cx="470" cy="85" r="7" fill="var(--terrain)"/><text x="470" y="120" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle">POINT</text><polyline points="530,130 570,60 620,90" fill="none" stroke="var(--terrain)" stroke-width="3"/><text x="575" y="150" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle">LINESTRING</text></svg><figcaption>Un polygone (à gauche) avec ses sommets, ses segments, son contour et son intérieur ; un point et une ligne (à droite).</figcaption></figure>
+<div class="terme"><div class="t-nom">Sommet<span class="t-en">vertex, point</span></div><div class="t-def">Un point défini par ses coordonnées X et Y.<br><span class="t-ex">À Malicounda : le lot 3710 a 4 sommets.</span><br><span class="fn">PostGIS : <code>ST_NPoints()</code></span></div></div>
+<div class="terme"><div class="t-nom">Segment<span class="t-en">segment</span></div><div class="t-def">Le trait droit entre deux sommets qui se suivent.<br><span class="t-ex">À Malicounda : chaque côté de 15 m ou 20 m du lot 3710.</span></div></div>
+<div class="terme"><div class="t-nom">Contour (limite)<span class="t-en">boundary</span></div><div class="t-def">La suite de segments qui entoure un polygone. Il doit être <b>fermé</b> : le dernier point est le même que le premier.<br><span class="t-ex">À Malicounda : le contour du lot 3710 a 5 points : 4 sommets + le retour au départ.</span><br><span class="fn">PostGIS : <code>ST_Boundary(), ST_Perimeter()</code></span></div></div>
+<div class="terme"><div class="t-nom">Intérieur<span class="t-en">interior</span></div><div class="t-def">Toute la surface à l'intérieur du contour.<br><span class="t-ex">À Malicounda : le terrain du lot.</span><br><span class="fn">PostGIS : <code>ST_Area()</code></span></div></div>
+<div class="tablewrap"><table class="resultat"><tr><th>Type</th><th>Dimension</th><th>Ce qu&#x27;on peut mesurer</th><th>À Malicounda</th></tr><tr><td>POINT</td><td>0 (sans taille)</td><td>rien : seulement une position</td><td>une borne, le centre d&#x27;un lot</td></tr><tr><td>LINESTRING</td><td>1 (longueur)</td><td>une longueur</td><td>l&#x27;axe d&#x27;une voie, la limite entre deux lots</td></tr><tr><td>POLYGON</td><td>2 (surface)</td><td>une surface et un périmètre</td><td>un lot</td></tr><tr><td>MULTI…</td><td>idem</td><td>idem, pour plusieurs morceaux</td><td>MULTIPOLYGON : type des lots livrés par QGIS</td></tr></table></div>
+<div class="note"><b>Les dimensions des coordonnées : XY et XYZ</b><p>À ne pas confondre avec la dimension de la forme : une coordonnée peut avoir 2 valeurs (X, Y) ou 3 (X, Y, Z = altitude). Les lots de Malicounda sont en XYZ avec Z = 0 (<code>ST_NDims</code> renvoie 3).</p></div>
+</section><section class="chapitre" id="s3"><span class="num">Partie 1 · Chapitre 3</span><h2>Se repérer sur la Terre : coordonnées, projection, SRID</h2><p class="duree">Séance 1 · 40 min</p><div class="retenir"><b>Objectif</b><p>Comprendre pourquoi un même lot peut avoir deux jeux de coordonnées, et lequel utiliser.</p></div>
+<figure class="schema"><svg viewBox="0 0 640 180" role="img" aria-label="La Terre est ronde : on la repère en degrés. Pour mesurer en mètres, on la « déplie » sur un plan : c'est la projection. UTM découpe la Terre en bandes ; le Sénégal est surtout en zone 28."><circle cx="90" cy="85" r="65" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><ellipse cx="90" cy="85" rx="65" ry="18" fill="none" stroke="var(--encre)" stroke-dasharray="3 3"/><ellipse cx="90" cy="85" rx="22" ry="65" fill="none" stroke="var(--encre)" stroke-dasharray="3 3"/><text x="90" y="168" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle">Terre : degrés (4326)</text><path d="M175,85 L255,85" stroke="var(--encre)" stroke-width="2" marker-end="url(#fl)"/><text x="215" y="75" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">projection</text><text x="215" y="105" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">ST_Transform</text><rect x="270" y="25" width="50" height="120" fill="var(--encre-clair)" stroke="var(--encre)"/><text x="295" y="90" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">27</text><rect x="320" y="25" width="50" height="120" fill="var(--encre-clair)" stroke="var(--encre)"/><text x="345" y="90" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">28</text><rect x="370" y="25" width="50" height="120" fill="var(--terrain-clair)" stroke="var(--encre)"/><text x="395" y="90" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">29</text><rect x="420" y="25" width="50" height="120" fill="var(--encre-clair)" stroke="var(--encre)"/><text x="445" y="90" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">30</text><text x="370" y="168" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle">Carte plane UTM : mètres (32628 = zone 28)</text><defs><marker id="fl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--encre)"/></marker></defs></svg><figcaption>La Terre est ronde : on la repère en degrés. Pour mesurer en mètres, on la « déplie » sur un plan : c'est la projection. UTM découpe la Terre en bandes ; le Sénégal est surtout en zone 28.</figcaption></figure>
+<div class="terme"><div class="t-nom">Ellipsoïde<span class="t-en">ellipsoid</span></div><div class="t-def">La forme mathématique (légèrement aplatie) qui représente la Terre.<br><span class="t-ex">À Malicounda : WGS 84, le même que celui du GPS.</span></div></div>
+<div class="terme"><div class="t-nom">Système géodésique (datum)<span class="t-en">datum</span></div><div class="t-def">L'ellipsoïde + la façon dont il est posé sur la Terre. Il fixe l'origine des coordonnées.<br><span class="t-ex">À Malicounda : WGS 84.</span></div></div>
+<div class="terme"><div class="t-nom">Coordonnées géographiques<span class="t-en">geographic coordinates</span></div><div class="t-def"><b>Longitude</b> (est-ouest) et <b>latitude</b> (nord-sud), en degrés.<br><span class="t-ex">À Malicounda : le lot 3710 est à longitude -16,9579, latitude 14,4487.</span></div></div>
+<div class="terme"><div class="t-nom">Projection<span class="t-en">projection</span></div><div class="t-def">La méthode qui transforme la surface courbe de la Terre en carte plane. Elle permet de mesurer en mètres.<br><span class="t-ex">À Malicounda : UTM (Mercator Transverse Universelle).</span></div></div>
+<div class="terme"><div class="t-nom">Zone UTM<span class="t-en">UTM zone</span></div><div class="t-def">UTM découpe la Terre en 60 bandes de 6° de longitude. Chaque zone a sa propre carte plane.<br><span class="t-ex">À Malicounda : Malicounda est dans la zone 28 Nord (de 18° O à 12° O). L'extrême est du Sénégal est en zone 29.</span></div></div>
+<div class="terme"><div class="t-nom">Coordonnées projetées<span class="t-en">projected coordinates</span></div><div class="t-def"><b>X</b> (vers l'est) et <b>Y</b> (vers le nord), en mètres, sur la carte plane.<br><span class="t-ex">À Malicounda : le lot 3710 est à X = 288 946 m, Y = 1 598 255 m.</span><br><span class="fn">PostGIS : <code>ST_X(), ST_Y()</code></span></div></div>
+<div class="terme"><div class="t-nom">EPSG / SRID<span class="t-en">EPSG code / Spatial Reference ID</span></div><div class="t-def">Le numéro qui identifie un système de coordonnées. EPSG est le catalogue international ; dans PostGIS, ce numéro s'appelle le SRID.<br><span class="t-ex">À Malicounda : 32628 = WGS 84 / UTM 28 N (le plan) ; 4326 = WGS 84 en degrés (GPS).</span><br><span class="fn">PostGIS : <code>ST_SRID(), ST_SetSRID(), ST_Transform()</code></span></div></div>
+<div class="piege"><b>Ne jamais mesurer en degrés</b><p>Un degré de longitude ne fait pas la même longueur partout sur la Terre. <code>ST_Area</code> sur des coordonnées en 4326 donnerait des « degrés carrés », sans signification. Pour mesurer, on travaille en 32628.</p></div>
+</section><section class="chapitre" id="s4"><span class="num">Partie 1 · Chapitre 4</span><h2>Relations entre objets : la topologie</h2><p class="duree">Séance 1 · 25 min</p><div class="retenir"><b>Objectif</b><p>Savoir décrire comment deux objets sont placés l'un par rapport à l'autre.</p></div>
+<p>La <b>topologie</b> étudie les relations entre objets, indépendamment de leurs mesures exactes : se toucher, se chevaucher, être l'un dans l'autre, être séparés.</p><figure class="schema"><svg viewBox="0 0 640 165" role="img" aria-label="Les cinq relations de base. En rouge : ce que les deux formes partagent."><g transform="translate(0,0)"><rect x="10" y="30" width="50" height="70" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><rect x="60" y="30" width="50" height="70" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-width="2" fill-opacity=".85"/><line x1="60" y1="30" x2="60" y2="100" stroke="var(--alerte)" stroke-width="4"/><text x="60" y="140" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-weight="700">ST_Touches</text><text x="60" y="158" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5" fill="var(--gris)">bord commun</text></g><g transform="translate(130,0)"><rect x="10" y="40" width="60" height="60" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><rect x="45" y="15" width="60" height="60" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-width="2" fill-opacity=".85"/><rect x="45" y="40" width="25" height="35" fill="var(--alerte)" fill-opacity=".35"/><text x="60" y="140" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-weight="700">ST_Overlaps</text><text x="60" y="158" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5" fill="var(--gris)">recouvrement</text></g><g transform="translate(260,0)"><rect x="10" y="15" width="100" height="95" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><rect x="40" y="45" width="40" height="35" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-width="2" fill-opacity=".85"/><text x="25" y="32" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">A</text><text x="60" y="67" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">B</text><text x="60" y="140" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-weight="700">ST_Contains</text><text x="60" y="158" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5" fill="var(--gris)">A contient B</text></g><g transform="translate(390,0)"><rect x="10" y="15" width="100" height="95" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-width="2" fill-opacity=".85"/><rect x="40" y="45" width="40" height="35" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><text x="25" y="32" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">B</text><text x="60" y="67" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">A</text><text x="60" y="140" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-weight="700">ST_Within</text><text x="60" y="158" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5" fill="var(--gris)">A dans B</text></g><g transform="translate(520,0)"><rect x="5" y="35" width="40" height="60" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><rect x="75" y="35" width="40" height="60" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-width="2" fill-opacity=".85"/><line x1="45" y1="65" x2="75" y2="65" stroke="var(--gris)" stroke-dasharray="4 3"/><text x="60" y="115" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11">distance</text><text x="60" y="140" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-weight="700">ST_Disjoint</text><text x="60" y="158" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5" fill="var(--gris)">séparés</text></g></svg><figcaption>Les cinq relations de base. En rouge : ce que les deux formes partagent.</figcaption></figure>
+<div class="terme"><div class="t-nom">Adjacence (contiguïté)<span class="t-en">adjacency</span></div><div class="t-def">Deux objets qui se touchent par le bord sans se recouvrir.<br><span class="t-ex">À Malicounda : les lots 3709 et 3710 sont voisins : ils partagent une limite de 15 m.</span><br><span class="fn">PostGIS : <code>ST_Touches()</code></span></div></div>
+<div class="terme"><div class="t-nom">Chevauchement<span class="t-en">overlap</span></div><div class="t-def">Deux surfaces qui se recouvrent en partie. Entre deux lots, c'est une erreur de dessin.<br><span class="t-ex">À Malicounda : 8 paires de lots se chevauchent dans le plan (à corriger).</span><br><span class="fn">PostGIS : <code>ST_Overlaps()</code></span></div></div>
+<div class="terme"><div class="t-nom">Inclusion<span class="t-en">containment</span></div><div class="t-def">Un objet entièrement à l'intérieur d'un autre.<br><span class="t-ex">À Malicounda : un point GPS pris sur le terrain est contenu dans un lot.</span><br><span class="fn">PostGIS : <code>ST_Contains(), ST_Within()</code></span></div></div>
+<div class="terme"><div class="t-nom">Disjonction<span class="t-en">disjoint</span></div><div class="t-def">Deux objets sans aucun point commun.<br><span class="t-ex">À Malicounda : deux lots dans des îlots différents.</span><br><span class="fn">PostGIS : <code>ST_Disjoint()</code></span></div></div>
+<div class="terme"><div class="t-nom">Jointure spatiale<span class="t-en">spatial join</span></div><div class="t-def">Relier les lignes de deux tables non pas par un identifiant, mais par une relation géométrique.<br><span class="t-ex">À Malicounda : trouver, pour chaque borne, le lot qui la contient.</span></div></div>
+<div class="terme"><div class="t-nom">Index spatial<span class="t-en">spatial index</span></div><div class="t-def">Un « sommaire » qui range les géométries par zone pour retrouver vite les objets proches.<br><span class="t-ex">À Malicounda : le dump crée un index GIST sur <code>wkb_geometry</code>.</span></div></div>
+</section><section class="chapitre" id="s5"><span class="num">Partie 1 · Chapitre 5</span><h2>Formes calculées : centroïde, emprise, tampon…</h2><p class="duree">Séance 1 · 20 min</p><div class="retenir"><b>Objectif</b><p>Connaître les nouvelles formes que l'on peut fabriquer à partir d'une géométrie.</p></div>
+<figure class="schema"><svg viewBox="0 0 640 165" role="img" aria-label="De gauche à droite : centroïde et point sur surface ; emprise ; tampon ; intersection et union."><polygon points="20,20 130,20 130,45 50,45 50,105 130,105 130,130 20,130" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><circle cx="65" cy="75" r="5" fill="var(--alerte)"/><text x="100" y="79" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">centroïde</text><circle cx="35" cy="75" r="5" fill="var(--terrain)"/><text x="75" y="150" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">point sur surface (vert)</text><rect x="180" y="20" width="110" height="110" fill="none" stroke="var(--jalon)" stroke-dasharray="5 3" stroke-width="2"/><polygon points="195,110 230,30 280,70 250,120" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><text x="235" y="150" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">emprise (enveloppe)</text><rect x="330" y="10" width="140" height="130" rx="22" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-dasharray="5 3"/><rect x="352" y="32" width="96" height="86" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><text x="400" y="80" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">lot</text><text x="400" y="158" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">tampon de 10 m</text><rect x="500" y="40" width="70" height="70" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><rect x="545" y="20" width="70" height="70" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-width="2" fill-opacity=".85"/><rect x="545" y="40" width="25" height="50" fill="var(--alerte)" fill-opacity=".45"/><text x="560" y="135" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">intersection (rouge)</text><text x="560" y="152" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">union = tout</text></svg><figcaption>De gauche à droite : centroïde et point sur surface ; emprise ; tampon ; intersection et union.</figcaption></figure>
+<div class="terme"><div class="t-nom">Centroïde<span class="t-en">centroid</span></div><div class="t-def">Le centre de gravité d'une forme. Attention : pour une forme en C ou en L, il peut tomber dehors (schéma ci-dessus).<br><span class="t-ex">À Malicounda : le centre du lot 3710.</span><br><span class="fn">PostGIS : <code>ST_Centroid()</code></span></div></div>
+<div class="terme"><div class="t-nom">Point sur surface<span class="t-en">point on surface</span></div><div class="t-def">Un point garanti à l'intérieur de la forme. Idéal pour placer une étiquette.<br><span class="t-ex">À Malicounda : l'endroit où afficher le numéro du lot.</span><br><span class="fn">PostGIS : <code>ST_PointOnSurface()</code></span></div></div>
+<div class="terme"><div class="t-nom">Emprise<span class="t-en">bounding box, extent</span></div><div class="t-def">Le plus petit rectangle aligné sur les axes qui contient la forme.<br><span class="t-ex">À Malicounda : l'emprise du lotissement fait environ 2,05 km × 1,93 km.</span><br><span class="fn">PostGIS : <code>ST_Envelope(), ST_Extent()</code></span></div></div>
+<div class="terme"><div class="t-nom">Zone tampon<span class="t-en">buffer</span></div><div class="t-def">La zone de tous les points situés à moins d'une distance donnée d'un objet.<br><span class="t-ex">À Malicounda : une bande de 10 m autour d'un lot, ou une servitude de 6 m le long d'une voie.</span><br><span class="fn">PostGIS : <code>ST_Buffer()</code></span></div></div>
+<div class="terme"><div class="t-nom">Intersection<span class="t-en">intersection</span></div><div class="t-def">La partie commune à deux formes.<br><span class="t-ex">À Malicounda : la limite commune entre deux lots voisins.</span><br><span class="fn">PostGIS : <code>ST_Intersection()</code></span></div></div>
+<div class="terme"><div class="t-nom">Union (fusion)<span class="t-en">union, dissolve</span></div><div class="t-def">Une seule forme qui réunit plusieurs formes.<br><span class="t-ex">À Malicounda : fusionner les lots d'un îlot pour obtenir le contour de l'îlot.</span><br><span class="fn">PostGIS : <code>ST_Union()</code></span></div></div>
+</section><section class="chapitre" id="s6"><span class="num">Partie 1 · Chapitre 6</span><h2>Les formats : WKT, WKB, GeoJSON, shapefile…</h2><p class="duree">Séance 1 · 15 min</p><div class="retenir"><b>Objectif</b><p>Reconnaître les formats rencontrés dans la chaîne DWG → QGIS → PostGIS.</p></div>
+<div class="tablewrap"><table class="resultat"><tr><th>Format</th><th>Nature</th><th>Où on le rencontre</th></tr><tr><td>DWG / DXF</td><td>fichiers de dessin CAO</td><td>le plan d&#x27;origine du lotissement (AutoCAD)</td></tr><tr><td>Shapefile (.shp + .dbf + .shx + .prj)</td><td>fichiers SIG ; noms de colonnes limités à 10 caractères</td><td>les couches intermédiaires ; explique « nom lotiss »</td></tr><tr><td>GeoPackage (.gpkg)</td><td>fichier SIG moderne, une seule base</td><td>Malicounda_Est.gpkg</td></tr><tr><td>WKT</td><td>géométrie écrite en texte lisible</td><td>POINT(288945 1598255) ; ST_AsText()</td></tr><tr><td>WKB</td><td>géométrie codée en binaire (affichée en hexadécimal)</td><td>les valeurs &#x27;01060000A0747F…&#x27; du dump SQL</td></tr><tr><td>GeoJSON</td><td>géométrie en texte JSON, utilisée par le web</td><td>cartes web, applications mobiles ; ST_AsGeoJSON()</td></tr></table></div>
+</section><section class="chapitre" id="s7"><span class="num">Partie 2 · Chapitre 7</span><h2>Que veut dire « ST_ » ?</h2><p class="duree">Séance 2 · 15 min</p><div class="retenir"><b>Objectif</b><p>Comprendre comment sont nommées et organisées les fonctions PostGIS.</p></div>
+<p><b>ST</b> signifie <b>Spatial Type</b> (type spatial). Ce préfixe vient des normes internationales (OGC <i>Simple Features</i> et ISO <i>SQL/MM</i>) : on retrouve les mêmes noms dans d'autres logiciels (SQL Server, Oracle, SpatiaLite, BigQuery). Apprendre <code>ST_Area</code> une fois sert partout.</p><p>Une fonction se lit comme une phrase : <code>ST_Verbe(géométrie, autres paramètres)</code>, et elle <b>renvoie</b> une valeur d'un type précis.</p><div class="tablewrap"><table class="resultat"><tr><th>Famille</th><th>Question posée</th><th>Ce que ça renvoie</th><th>Exemples</th></tr><tr><td>Construire</td><td>comment créer une géométrie ?</td><td>une géométrie</td><td>ST_GeomFromText, ST_MakePoint, ST_SetSRID</td></tr><tr><td>Décrire</td><td>comment est-elle faite ?</td><td>texte ou nombre</td><td>ST_AsText, GeometryType, ST_SRID, ST_NPoints, ST_X</td></tr><tr><td>Mesurer</td><td>combien ?</td><td>un nombre (m, m²)</td><td>ST_Area, ST_Perimeter, ST_Length, ST_Distance</td></tr><tr><td>Relations</td><td>est-ce que… ?</td><td>vrai / faux</td><td>ST_Intersects, ST_Touches, ST_Contains, ST_DWithin</td></tr><tr><td>Fabriquer</td><td>quelle nouvelle forme ?</td><td>une géométrie</td><td>ST_Centroid, ST_Buffer, ST_Intersection, ST_Union</td></tr><tr><td>Systèmes</td><td>dans quel repère ?</td><td>une géométrie</td><td>ST_Transform, ST_SetSRID</td></tr><tr><td>Contrôler</td><td>est-elle correcte ?</td><td>vrai / faux ou géométrie</td><td>ST_IsValid, ST_IsValidReason, ST_MakeValid</td></tr></table></div>
+<div class="astuce"><b>Trouver la documentation</b><p>Chaque fonction a sa page sur <code>postgis.net/docs/</code> suivie de son nom, par exemple <code>postgis.net/docs/ST_Area.html</code>.</p></div>
+<p>Dans la suite, chaque fonction est d'abord essayée sur des formes simples (carrés de 10 sur 10, sans SRID), puis sur les lots réels.</p></section><section class="chapitre" id="s8"><span class="num">Partie 2 · Chapitre 8</span><h2>Construire une géométrie</h2><p class="duree">Séance 2 · 15 min</p><div class="fiche"><div class="f-nom">ST_GeomFromText</div><div class="f-syn"><code>ST_GeomFromText('WKT', srid)</code></div><div class="f-ret">renvoie : <b>geometry</b></div><div class="f-role">Fabrique une géométrie à partir de son écriture WKT.</div></div>
+<div class="fiche"><div class="f-nom">ST_MakePoint</div><div class="f-syn"><code>ST_MakePoint(x, y)</code></div><div class="f-ret">renvoie : <b>geometry (POINT)</b></div><div class="f-role">Fabrique un point à partir de deux nombres. Pour un GPS : x = longitude, y = latitude.</div></div>
+<div class="fiche"><div class="f-nom">ST_SetSRID</div><div class="f-syn"><code>ST_SetSRID(geom, srid)</code></div><div class="f-ret">renvoie : <b>geometry</b></div><div class="f-role">Indique dans quel système sont les coordonnées. Ne change pas les coordonnées.</div></div>
+<pre><code><span class="k">SELECT</span> ST_AsText(ST_MakePoint(-16.9579, 14.4487))                 <span class="k">AS</span> point,
+       ST_SRID(ST_MakePoint(-16.9579, 14.4487))                   <span class="k">AS</span> srid_sans,
+       ST_SRID(ST_SetSRID(ST_MakePoint(-16.9579, 14.4487), 4326)) <span class="k">AS</span> srid_avec;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>point</th><th>srid_sans</th><th>srid_avec</th></tr><tr><td>POINT(-16.9579 14.4487)</td><td>0</td><td>4326</td></tr></table></div>
+<p>Un SRID de 0 veut dire « système inconnu ». Il faut toujours le préciser avec <code>ST_SetSRID</code>.</p><div class="piege"><b>Longitude d'abord</b><p>Google Maps affiche « latitude, longitude » (14.4487, -16.9579). PostGIS veut <b>X puis Y</b>, donc <b>longitude puis latitude</b> : <code>ST_MakePoint(-16.9579, 14.4487)</code>. Inverser les deux envoie le point dans le sud de l'Angola.</p></div>
+</section><section class="chapitre" id="s9"><span class="num">Partie 2 · Chapitre 9</span><h2>Décrire une géométrie</h2><p class="duree">Séance 2 · 20 min</p><div class="fiche"><div class="f-nom">ST_AsText</div><div class="f-syn"><code>ST_AsText(geom)</code></div><div class="f-ret">renvoie : <b>texte (WKT)</b></div><div class="f-role">Affiche la géométrie en texte lisible.</div></div>
+<div class="fiche"><div class="f-nom">GeometryType</div><div class="f-syn"><code>GeometryType(geom)</code></div><div class="f-ret">renvoie : <b>texte</b></div><div class="f-role">Le type de forme : POINT, POLYGON, MULTIPOLYGON…</div></div>
+<div class="fiche"><div class="f-nom">ST_SRID</div><div class="f-syn"><code>ST_SRID(geom)</code></div><div class="f-ret">renvoie : <b>entier</b></div><div class="f-role">Le système de coordonnées.</div></div>
+<div class="fiche"><div class="f-nom">ST_NPoints · ST_NumGeometries · ST_NDims</div><div class="f-syn"><code>ST_NPoints(geom)</code></div><div class="f-ret">renvoie : <b>entier</b></div><div class="f-role">Le nombre de points, de morceaux, de dimensions de coordonnées.</div></div>
+<div class="fiche"><div class="f-nom">ST_X · ST_Y</div><div class="f-syn"><code>ST_X(point)</code></div><div class="f-ret">renvoie : <b>nombre</b></div><div class="f-role">Les coordonnées d'un point.</div></div>
+<div class="fiche"><div class="f-nom">ST_AsGeoJSON</div><div class="f-syn"><code>ST_AsGeoJSON(geom, decimales)</code></div><div class="f-ret">renvoie : <b>texte (JSON)</b></div><div class="f-role">La géométrie au format GeoJSON.</div></div>
+<pre><code><span class="k">SELECT</span> "n° du lot",
+       GeometryType(wkb_geometry)    <span class="k">AS</span> type,
+       ST_SRID(wkb_geometry)         <span class="k">AS</span> srid,
+       ST_NDims(wkb_geometry)        <span class="k">AS</span> dims,
+       ST_NumGeometries(wkb_geometry) <span class="k">AS</span> morceaux,
+       ST_NPoints(wkb_geometry)      <span class="k">AS</span> points
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> "n° du lot" <span class="k">IN</span> ('3710', '3709');</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>n° du lot</th><th>type</th><th>srid</th><th>dims</th><th>morceaux</th><th>points</th></tr><tr><td>3710</td><td>MULTIPOLYGON</td><td>32628</td><td>3</td><td>1</td><td>5</td></tr><tr><td>3709</td><td>MULTIPOLYGON</td><td>32628</td><td>3</td><td>1</td><td>5</td></tr></table></div>
+<p>Chaque lot est un MULTIPOLYGON d'<b>un seul morceau</b>, à 5 points (4 sommets + fermeture), avec des coordonnées XYZ.</p><div class="exo"><b>À vous 1.</b> Afficher la géométrie du lot 3710 en texte (WKT), puis en GeoJSON avec 2 décimales.<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> ST_AsText(wkb_geometry)        <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" = '3710';
+<span class="k">SELECT</span> ST_AsGeoJSON(wkb_geometry, 2) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" = '3710';</code></pre>
+</details></div>
+</section><section class="chapitre" id="s10"><span class="num">Partie 2 · Chapitre 10</span><h2>Mesurer</h2><p class="duree">Séance 2 · 20 min</p><div class="fiche"><div class="f-nom">ST_Area</div><div class="f-syn"><code>ST_Area(polygone)</code></div><div class="f-ret">renvoie : <b>nombre (m²)</b></div><div class="f-role">La surface.</div></div>
+<div class="fiche"><div class="f-nom">ST_Perimeter</div><div class="f-syn"><code>ST_Perimeter(polygone)</code></div><div class="f-ret">renvoie : <b>nombre (m)</b></div><div class="f-role">La longueur du contour.</div></div>
+<div class="fiche"><div class="f-nom">ST_Length</div><div class="f-syn"><code>ST_Length(ligne)</code></div><div class="f-ret">renvoie : <b>nombre (m)</b></div><div class="f-role">La longueur d'une ligne. Vaut 0 pour un polygone : utiliser ST_Perimeter.</div></div>
+<div class="fiche"><div class="f-nom">ST_Distance</div><div class="f-syn"><code>ST_Distance(geom1, geom2)</code></div><div class="f-ret">renvoie : <b>nombre (m)</b></div><div class="f-role">La plus courte distance entre les deux formes (de bord à bord). 0 si elles se touchent.</div></div>
+<pre><code><span class="k">SELECT</span> ROUND(ST_Area(wkb_geometry))      <span class="k">AS</span> surface_m2,
+       ROUND(ST_Perimeter(wkb_geometry)) <span class="k">AS</span> perimetre_m
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> "n° du lot" = '3710';
+
+<span class="k">SELECT</span> ROUND(ST_Distance(a.wkb_geometry, b.wkb_geometry)::numeric, 1) <span class="k">AS</span> distance_m
+<span class="k">FROM</span> "malicouda est" a, "malicouda est" b
+<span class="k">WHERE</span> a."n° du lot" = '3710' <span class="k">AND</span> b."n° du lot" = '2944';</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>surface_m2</th><th>perimetre_m</th></tr><tr><td>300</td><td>70</td></tr></table></div>
+<div class="tablewrap"><table class="resultat"><tr><th>distance_m</th></tr><tr><td>287.9</td></tr></table></div><p class="legende">Les mesures sont en mètres parce que les lots sont en SRID 32628.</p>
+</section><section class="chapitre" id="s11"><span class="num">Partie 2 · Chapitre 11</span><h2>Tester une relation (vrai / faux)</h2><p class="duree">Séance 2 · 40 min</p><div class="retenir"><b>Objectif</b><p>Traduire les mots de la topologie (chapitre 4) en fonctions.</p></div>
+<figure class="schema"><svg viewBox="0 0 640 165" role="img" aria-label="Rappel des relations."><g transform="translate(0,0)"><rect x="10" y="30" width="50" height="70" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><rect x="60" y="30" width="50" height="70" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-width="2" fill-opacity=".85"/><line x1="60" y1="30" x2="60" y2="100" stroke="var(--alerte)" stroke-width="4"/><text x="60" y="140" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-weight="700">ST_Touches</text><text x="60" y="158" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5" fill="var(--gris)">bord commun</text></g><g transform="translate(130,0)"><rect x="10" y="40" width="60" height="60" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><rect x="45" y="15" width="60" height="60" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-width="2" fill-opacity=".85"/><rect x="45" y="40" width="25" height="35" fill="var(--alerte)" fill-opacity=".35"/><text x="60" y="140" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-weight="700">ST_Overlaps</text><text x="60" y="158" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5" fill="var(--gris)">recouvrement</text></g><g transform="translate(260,0)"><rect x="10" y="15" width="100" height="95" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><rect x="40" y="45" width="40" height="35" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-width="2" fill-opacity=".85"/><text x="25" y="32" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">A</text><text x="60" y="67" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">B</text><text x="60" y="140" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-weight="700">ST_Contains</text><text x="60" y="158" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5" fill="var(--gris)">A contient B</text></g><g transform="translate(390,0)"><rect x="10" y="15" width="100" height="95" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-width="2" fill-opacity=".85"/><rect x="40" y="45" width="40" height="35" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><text x="25" y="32" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">B</text><text x="60" y="67" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="12">A</text><text x="60" y="140" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-weight="700">ST_Within</text><text x="60" y="158" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5" fill="var(--gris)">A dans B</text></g><g transform="translate(520,0)"><rect x="5" y="35" width="40" height="60" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><rect x="75" y="35" width="40" height="60" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-width="2" fill-opacity=".85"/><line x1="45" y1="65" x2="75" y2="65" stroke="var(--gris)" stroke-dasharray="4 3"/><text x="60" y="115" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11">distance</text><text x="60" y="140" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-weight="700">ST_Disjoint</text><text x="60" y="158" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5" fill="var(--gris)">séparés</text></g></svg><figcaption>Rappel des relations.</figcaption></figure>
+<div class="tablewrap"><table class="resultat"><tr><th>Fonction</th><th>Vraie quand…</th></tr><tr><td>ST_Intersects(a, b)</td><td>a et b ont au moins un point commun (le contraire de ST_Disjoint)</td></tr><tr><td>ST_Touches(a, b)</td><td>a et b se touchent par le bord, sans que leurs intérieurs se recouvrent</td></tr><tr><td>ST_Overlaps(a, b)</td><td>a et b se recouvrent en partie (deux surfaces)</td></tr><tr><td>ST_Contains(a, b)</td><td>b est entièrement dans a</td></tr><tr><td>ST_Within(a, b)</td><td>a est entièrement dans b (l&#x27;inverse de Contains)</td></tr><tr><td>ST_Disjoint(a, b)</td><td>a et b n&#x27;ont aucun point commun</td></tr><tr><td>ST_Equals(a, b)</td><td>a et b sont exactement la même forme</td></tr><tr><td>ST_DWithin(a, b, d)</td><td>a et b sont à une distance inférieure ou égale à d</td></tr></table></div>
+<h3>11.1 Essai sur des carrés simples</h3><p>A = carré de 0 à 10 ; B = son voisin de droite ; C = carré décalé qui chevauche A ; D = petit carré dans A ; E = carré à 20 unités de A.</p><pre><code><span class="k">SELECT</span> ST_Touches  ('POLYGON((0 0,10 0,10 10,0 10,0 0))', 'POLYGON((10 0,20 0,20 10,10 10,10 0))') <span class="k">AS</span> a_touche_b,
+       ST_Overlaps ('POLYGON((0 0,10 0,10 10,0 10,0 0))', 'POLYGON((5 5,15 5,15 15,5 15,5 5))')     <span class="k">AS</span> a_chevauche_c,
+       ST_Contains ('POLYGON((0 0,10 0,10 10,0 10,0 0))', 'POLYGON((2 2,4 2,4 4,2 4,2 2))')         <span class="k">AS</span> a_contient_d,
+       ST_Disjoint ('POLYGON((0 0,10 0,10 10,0 10,0 0))', 'POLYGON((30 0,40 0,40 10,30 10,30 0))') <span class="k">AS</span> a_separe_e;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>a_touche_b</th><th>a_chevauche_c</th><th>a_contient_d</th><th>a_separe_e</th></tr><tr><td>true</td><td>true</td><td>true</td><td>true</td></tr></table></div>
+<p>Tableau complet, obtenu en testant chaque fonction sur chaque paire :</p><div class="tablewrap"><table class="resultat"><tr><th>Paire</th><th>Intersects</th><th>Touches</th><th>Overlaps</th><th>Contains</th><th>Within</th><th>Disjoint</th><th>Distance</th></tr><tr><td>A et B (voisins)</td><td>vrai</td><td>vrai</td><td>faux</td><td>faux</td><td>faux</td><td>faux</td><td>0</td></tr><tr><td>A et C (chevauchement)</td><td>vrai</td><td>faux</td><td>vrai</td><td>faux</td><td>faux</td><td>faux</td><td>0</td></tr><tr><td>A et D (D dans A)</td><td>vrai</td><td>faux</td><td>faux</td><td>vrai</td><td>faux</td><td>faux</td><td>0</td></tr><tr><td>D et A</td><td>vrai</td><td>faux</td><td>faux</td><td>faux</td><td>vrai</td><td>faux</td><td>0</td></tr><tr><td>A et E (séparés)</td><td>faux</td><td>faux</td><td>faux</td><td>faux</td><td>faux</td><td>vrai</td><td>20</td></tr></table></div>
+<div class="retenir"><b>À observer</b><p><code>ST_Intersects</code> est vrai dans tous les cas sauf « séparés » : c'est la relation la plus large. L'ordre compte pour <code>ST_Contains</code> et <code>ST_Within</code> : A contient D, mais D ne contient pas A.</p></div>
+<h3>11.2 Sur les lots réels</h3><pre><code><span class="k">SELECT</span> ST_Touches   (a.wkb_geometry, b.wkb_geometry) <span class="k">AS</span> se_touchent,
+       ST_Intersects(a.wkb_geometry, b.wkb_geometry) <span class="k">AS</span> ont_un_point_commun,
+       ST_Overlaps  (a.wkb_geometry, b.wkb_geometry) <span class="k">AS</span> se_chevauchent
+<span class="k">FROM</span> "malicouda est" a, "malicouda est" b
+<span class="k">WHERE</span> a."n° du lot" = '3710' <span class="k">AND</span> b."n° du lot" = '3709';</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>se_touchent</th><th>ont_un_point_commun</th><th>se_chevauchent</th></tr><tr><td>true</td><td>true</td><td>false</td></tr></table></div><p class="legende">Deux lots bien dessinés se touchent sans se chevaucher.</p>
+<h3>11.3 « Dans quel lot suis-je ? »</h3><p>Un agent relève au GPS la position -16,9579 ; 14,4487 sur le terrain. Quel lot est-ce ?</p><pre><code><span class="k">SELECT</span> "n° du lot"
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> ST_Contains(wkb_geometry,
+                  ST_Transform(ST_SetSRID(ST_MakePoint(-16.9579, 14.4487), 4326), 32628));</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>n° du lot</th></tr><tr><td>3710</td></tr></table></div>
+<p>On construit le point (ch. 8), on le passe en UTM (ch. 13), puis on teste l'inclusion. Trois familles de fonctions s'emboîtent dans une seule requête.</p><h3>11.4 Chercher dans un rayon : ST_DWithin</h3><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">AS</span> lots_a_moins_de_100m
+<span class="k">FROM</span> "malicouda est" l, "malicouda est" p
+<span class="k">WHERE</span> p."n° du lot" = '3710'
+  <span class="k">AND</span> ST_DWithin(l.wkb_geometry, p.wkb_geometry, 100)
+  <span class="k">AND</span> l.ogc_fid &lt;&gt; p.ogc_fid;            <span class="c">-- sans compter le lot lui-même</span></code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>lots_a_moins_de_100m</th></tr><tr><td>30</td></tr></table></div>
+<div class="astuce"><b>ST_DWithin plutôt que ST_Distance</b><p><code>ST_DWithin(a, b, 100)</code> et <code>ST_Distance(a, b) &lt;= 100</code> donnent le même résultat, mais la première utilise l'index spatial et répond beaucoup plus vite sur une grande table.</p></div>
+<div class="exo"><b>À vous 2.</b> Combien de lots touchent le lot 3709 ?<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> COUNT(*)
+<span class="k">FROM</span> "malicouda est" l, "malicouda est" p
+<span class="k">WHERE</span> p."n° du lot" = '3709'
+  <span class="k">AND</span> ST_Touches(l.wkb_geometry, p.wkb_geometry);</code></pre>
+<p class="legende">Résultat : 3.</p></details></div>
+</section><section class="chapitre" id="s12"><span class="num">Partie 2 · Chapitre 12</span><h2>Fabriquer de nouvelles formes</h2><p class="duree">Séance 2 · 35 min</p><figure class="schema"><svg viewBox="0 0 640 165" role="img" aria-label="Rappel des formes calculées."><polygon points="20,20 130,20 130,45 50,45 50,105 130,105 130,130 20,130" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><circle cx="65" cy="75" r="5" fill="var(--alerte)"/><text x="100" y="79" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">centroïde</text><circle cx="35" cy="75" r="5" fill="var(--terrain)"/><text x="75" y="150" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">point sur surface (vert)</text><rect x="180" y="20" width="110" height="110" fill="none" stroke="var(--jalon)" stroke-dasharray="5 3" stroke-width="2"/><polygon points="195,110 230,30 280,70 250,120" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><text x="235" y="150" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">emprise (enveloppe)</text><rect x="330" y="10" width="140" height="130" rx="22" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-dasharray="5 3"/><rect x="352" y="32" width="96" height="86" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><text x="400" y="80" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">lot</text><text x="400" y="158" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">tampon de 10 m</text><rect x="500" y="40" width="70" height="70" fill="var(--encre-clair)" stroke="var(--encre)" stroke-width="2"/><rect x="545" y="20" width="70" height="70" fill="var(--terrain-clair)" stroke="var(--terrain)" stroke-width="2" fill-opacity=".85"/><rect x="545" y="40" width="25" height="50" fill="var(--alerte)" fill-opacity=".45"/><text x="560" y="135" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">intersection (rouge)</text><text x="560" y="152" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="var(--texte)" text-anchor="middle" font-size="11.5">union = tout</text></svg><figcaption>Rappel des formes calculées.</figcaption></figure>
+<div class="fiche"><div class="f-nom">ST_Centroid · ST_PointOnSurface</div><div class="f-syn"><code>ST_Centroid(geom)</code></div><div class="f-ret">renvoie : <b>geometry (POINT)</b></div><div class="f-role">Le centre de gravité ; un point garanti à l'intérieur.</div></div>
+<div class="fiche"><div class="f-nom">ST_Envelope · ST_Extent</div><div class="f-syn"><code>ST_Envelope(geom) · ST_Extent(colonne)</code></div><div class="f-ret">renvoie : <b>geometry (POLYGON) · box2d</b></div><div class="f-role">L'emprise d'une forme ; l'emprise de toute une colonne (fonction d'agrégat).</div></div>
+<div class="fiche"><div class="f-nom">ST_Buffer</div><div class="f-syn"><code>ST_Buffer(geom, distance)</code></div><div class="f-ret">renvoie : <b>geometry (POLYGON)</b></div><div class="f-role">La zone tampon à la distance donnée (en mètres en 32628).</div></div>
+<div class="fiche"><div class="f-nom">ST_Intersection</div><div class="f-syn"><code>ST_Intersection(geom1, geom2)</code></div><div class="f-ret">renvoie : <b>geometry</b></div><div class="f-role">La partie commune. Son type dépend de la situation : surface, ligne ou point.</div></div>
+<div class="fiche"><div class="f-nom">ST_Union</div><div class="f-syn"><code>ST_Union(geom1, geom2) · ST_Union(colonne)</code></div><div class="f-ret">renvoie : <b>geometry</b></div><div class="f-role">La fusion de deux formes, ou de toute une colonne.</div></div>
+<h3>12.1 Centre et emprise</h3><pre><code><span class="k">SELECT</span> ROUND(ST_X(ST_Centroid(wkb_geometry))::numeric, 2) <span class="k">AS</span> x,
+       ROUND(ST_Y(ST_Centroid(wkb_geometry))::numeric, 2) <span class="k">AS</span> y
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> "n° du lot" = '3710';
+
+<span class="k">SELECT</span> ROUND(ST_Area(ST_Extent(wkb_geometry)::geometry) / 10000) <span class="k">AS</span> emprise_ha
+<span class="k">FROM</span> "malicouda est";</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>x</th><th>y</th></tr><tr><td>288945.74</td><td>1598255.28</td></tr></table></div>
+<div class="tablewrap"><table class="resultat"><tr><th>emprise_ha</th></tr><tr><td>396</td></tr></table></div><p class="legende">L'emprise du lotissement couvre 396 ha, alors que les lots n'en occupent que 105,6 : le rectangle englobe aussi les voies et les terrains autour.</p>
+<h3>12.2 La limite commune de deux lots</h3><pre><code><span class="k">SELECT</span> GeometryType(ST_Intersection(a.wkb_geometry, b.wkb_geometry))              <span class="k">AS</span> forme,
+       ROUND(ST_Length(ST_Intersection(a.wkb_geometry, b.wkb_geometry))::numeric, 2) <span class="k">AS</span> longueur_m,
+       ROUND(ST_Area(ST_Union(a.wkb_geometry, b.wkb_geometry)))                     <span class="k">AS</span> union_m2
+<span class="k">FROM</span> "malicouda est" a, "malicouda est" b
+<span class="k">WHERE</span> a."n° du lot" = '3710' <span class="k">AND</span> b."n° du lot" = '3709';</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>forme</th><th>longueur_m</th><th>union_m2</th></tr><tr><td>LINESTRING</td><td>15.00</td><td>600</td></tr></table></div>
+<p>L'intersection de deux lots voisins n'est <b>pas une surface</b> : c'est une <b>ligne</b>, leur limite commune, longue de 15 m. Leur union forme un terrain de 600 m².</p><h3>12.3 Une zone tampon autour d'un lot</h3><pre><code><span class="k">SELECT</span> ROUND(ST_Area(ST_Buffer(wkb_geometry, 10))) <span class="k">AS</span> surface_tampon_m2
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> "n° du lot" = '3710';
+
+<span class="k">SELECT</span> COUNT(*) <span class="k">AS</span> lots_dans_le_tampon
+<span class="k">FROM</span> "malicouda est" l, "malicouda est" p
+<span class="k">WHERE</span> p."n° du lot" = '3710'
+  <span class="k">AND</span> ST_Intersects(l.wkb_geometry, ST_Buffer(p.wkb_geometry, 10))
+  <span class="k">AND</span> l.ogc_fid &lt;&gt; p.ogc_fid;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>surface_tampon_m2</th></tr><tr><td>1312</td></tr></table></div>
+<div class="tablewrap"><table class="resultat"><tr><th>lots_dans_le_tampon</th></tr><tr><td>3</td></tr></table></div><p class="legende">Le lot et sa bande de 10 m couvrent 1 312 m² ; trois autres lots y entrent.</p>
+</section><section class="chapitre" id="s13"><span class="num">Partie 2 · Chapitre 13</span><h2>Changer de système de coordonnées</h2><p class="duree">Séance 2 · 15 min</p><div class="fiche"><div class="f-nom">ST_SetSRID</div><div class="f-syn"><code>ST_SetSRID(geom, srid)</code></div><div class="f-ret">renvoie : <b>geometry</b></div><div class="f-role">Colle une étiquette. Les coordonnées ne bougent pas. À utiliser quand le SRID est absent ou faux.</div></div>
+<div class="fiche"><div class="f-nom">ST_Transform</div><div class="f-syn"><code>ST_Transform(geom, srid_cible)</code></div><div class="f-ret">renvoie : <b>geometry</b></div><div class="f-role">Recalcule les coordonnées dans un autre système. À utiliser pour passer de l'UTM au GPS ou l'inverse.</div></div>
+<pre><code><span class="c">-- UTM -&gt; GPS : le centre du lot 3710 en degrés</span>
+<span class="k">SELECT</span> ST_AsText(ST_Transform(ST_Centroid(wkb_geometry), 4326))
+<span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" = '3710';
+
+<span class="c">-- GPS -&gt; UTM : un point relevé sur le terrain, en mètres</span>
+<span class="k">SELECT</span> ST_AsText(ST_Transform(ST_SetSRID(ST_MakePoint(-16.9579, 14.4487), 4326), 32628));</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>st_astext</th></tr><tr><td>POINT(-16.957897 14.448737)</td></tr></table></div>
+<div class="tablewrap"><table class="resultat"><tr><th>st_astext</th></tr><tr><td>POINT(288945.33 1598251.24)</td></tr></table></div>
+<div class="retenir"><b>La règle</b><p><b>SetSRID</b> = « je déclare dans quel système sont ces nombres ». <b>Transform</b> = « je veux ces mêmes lieux dans un autre système ». Pour un point GPS, on fait les deux : <code>ST_Transform(ST_SetSRID(point, 4326), 32628)</code>.</p></div>
+</section><section class="chapitre" id="s14"><span class="num">Partie 2 · Chapitre 14</span><h2>Contrôler la qualité</h2><p class="duree">Séance 2 · 15 min</p><div class="fiche"><div class="f-nom">ST_IsValid · ST_IsValidReason</div><div class="f-syn"><code>ST_IsValid(geom)</code></div><div class="f-ret">renvoie : <b>vrai/faux · texte</b></div><div class="f-role">La géométrie respecte-t-elle les règles ? Sinon, pourquoi ?</div></div>
+<div class="fiche"><div class="f-nom">ST_MakeValid</div><div class="f-syn"><code>ST_MakeValid(geom)</code></div><div class="f-ret">renvoie : <b>geometry</b></div><div class="f-role">Répare automatiquement une géométrie invalide.</div></div>
+<div class="fiche"><div class="f-nom">ST_Force2D</div><div class="f-syn"><code>ST_Force2D(geom)</code></div><div class="f-ret">renvoie : <b>geometry</b></div><div class="f-role">Supprime la coordonnée Z.</div></div>
+<p>Exemple de polygone invalide : un « nœud papillon », dont le contour se croise lui-même.</p><pre><code><span class="k">SELECT</span> ST_IsValid      ('POLYGON((0 0,10 10,10 0,0 10,0 0))') <span class="k">AS</span> valide,
+       ST_IsValidReason('POLYGON((0 0,10 10,10 0,0 10,0 0))') <span class="k">AS</span> raison,
+       ST_AsText(ST_MakeValid('POLYGON((0 0,10 10,10 0,0 10,0 0))')) <span class="k">AS</span> repare;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>valide</th><th>raison</th><th>repare</th></tr><tr><td>false</td><td>Self-intersection[5 5]</td><td>MULTIPOLYGON(((0 10,5 5,0 0,0 10)),((10 0,5 5,10 10,10 0)))</td></tr></table></div><p class="legende">ST_MakeValid coupe le papillon en deux triangles au point de croisement (5, 5).</p>
+<pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">AS</span> lots_invalides
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> <span class="k">NOT</span> ST_IsValid(wkb_geometry);</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>lots_invalides</th></tr><tr><td>0</td></tr></table></div><p class="legende">Le nettoyage dans QGIS a bien fonctionné : aucune géométrie invalide.</p>
+</section><section class="chapitre" id="s15"><span class="num">Chapitre 15</span><h2>Exercices de synthèse</h2><p class="duree">Séance 2 · 30 min (ou en autonomie)</p><div class="exo"><b>À vous 3.</b> Un terme par phrase : « la zone de 6 m le long d'une voie » ; « le rectangle qui englobe le lotissement » ; « le numéro 32628 » ; « deux lots qui partagent une limite ».<details><summary>Voir la réponse</summary><pre><code><span class="c">-- zone tampon (buffer)      -&gt; ST_Buffer</span>
+<span class="c">-- emprise (bounding box)     -&gt; ST_Envelope / ST_Extent</span>
+<span class="c">-- SRID (code EPSG)           -&gt; ST_SRID</span>
+<span class="c">-- adjacence                  -&gt; ST_Touches</span></code></pre>
+</details></div>
+<div class="exo"><b>À vous 4.</b> Donner la longitude et la latitude du point sur surface du lot 3709, arrondies à 6 décimales.<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> ROUND(ST_X(ST_Transform(ST_PointOnSurface(wkb_geometry), 4326))::numeric, 6) <span class="k">AS</span> longitude,
+       ROUND(ST_Y(ST_Transform(ST_PointOnSurface(wkb_geometry), 4326))::numeric, 6) <span class="k">AS</span> latitude
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> "n° du lot" = '3709';</code></pre>
+</details></div>
+<div class="exo"><b>À vous 5.</b> Combien de lots ont une partie à moins de 50 m du lot 2944 (sans compter le 2944) ?<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> COUNT(*)
+<span class="k">FROM</span> "malicouda est" l, "malicouda est" p
+<span class="k">WHERE</span> p."n° du lot" = '2944'
+  <span class="k">AND</span> ST_DWithin(l.wkb_geometry, p.wkb_geometry, 50)
+  <span class="k">AND</span> l.ogc_fid &lt;&gt; p.ogc_fid;</code></pre>
+<p class="legende">Résultat : 65. Le lot 2944 est grand (17 088 m²), son voisinage aussi.</p></details></div>
+<div class="exo"><b>À vous 6.</b> Quelle est la surface totale, en m², des lots 3707, 3708, 3709 et 3710 fusionnés ?<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> ROUND(ST_Area(ST_Union(wkb_geometry))) <span class="k">AS</span> surface_m2
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> "n° du lot" <span class="k">IN</span> ('3707', '3708', '3709', '3710');</code></pre>
+<p class="legende">Résultat : 1200 (4 lots de 300 m²). <code>ST_Union</code> utilisée ici comme agrégat, sur toute une colonne.</p></details></div>
+<div class="exo"><b>À vous 7.</b> Dans quel lot se trouve le point GPS longitude -16.95599, latitude 14.45155 ?<details><summary>Voir la réponse</summary><pre><code><span class="k">SELECT</span> "n° du lot", superficie
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> ST_Contains(wkb_geometry,
+                  ST_Transform(ST_SetSRID(ST_MakePoint(-16.95599, 14.45155), 4326), 32628));</code></pre>
+<p class="legende">Résultat : le lot 2944 (17 088 m²). Si aucune ligne n'apparaît, le point tombe hors des lots (sur une voie). Utiliser alors <code>ORDER BY wkb_geometry &lt;-&gt; point LIMIT 1</code> pour trouver le lot le plus proche.</p></details></div>
+</section><section class="chapitre" id="s16"><span class="num">Annexe</span><h2>Lexique récapitulatif</h2><div class="tablewrap"><table class="resultat"><tr><th>Terme français</th><th>Anglais</th><th>En bref</th><th>Fonction PostGIS</th></tr><tr><td>Entité</td><td>feature</td><td>un objet (un lot)</td><td></td></tr><tr><td>Attribut</td><td>attribute</td><td>une information sur l&#x27;objet</td><td></td></tr><tr><td>Géométrie</td><td>geometry</td><td>forme + position</td><td>GeometryType, ST_AsText</td></tr><tr><td>Sommet</td><td>vertex</td><td>un point du contour</td><td>ST_NPoints</td></tr><tr><td>Contour / limite</td><td>boundary</td><td>le bord d&#x27;un polygone</td><td>ST_Boundary, ST_Perimeter</td></tr><tr><td>Surface</td><td>area</td><td>mesure de l&#x27;intérieur</td><td>ST_Area</td></tr><tr><td>Longueur</td><td>length</td><td>mesure d&#x27;une ligne</td><td>ST_Length</td></tr><tr><td>Distance</td><td>distance</td><td>écart de bord à bord</td><td>ST_Distance, ST_DWithin</td></tr><tr><td>Système de coordonnées</td><td>CRS / SRS</td><td>repère des coordonnées</td><td>ST_SRID</td></tr><tr><td>Code EPSG / SRID</td><td>SRID</td><td>numéro du système</td><td>ST_SetSRID</td></tr><tr><td>Projection</td><td>projection</td><td>passage du globe au plan</td><td>ST_Transform</td></tr><tr><td>Adjacence</td><td>adjacency</td><td>se toucher par le bord</td><td>ST_Touches</td></tr><tr><td>Intersection</td><td>intersection</td><td>partie commune / avoir un point commun</td><td>ST_Intersection / ST_Intersects</td></tr><tr><td>Chevauchement</td><td>overlap</td><td>recouvrement</td><td>ST_Overlaps</td></tr><tr><td>Inclusion</td><td>containment</td><td>l&#x27;un dans l&#x27;autre</td><td>ST_Contains, ST_Within</td></tr><tr><td>Disjonction</td><td>disjoint</td><td>séparés</td><td>ST_Disjoint</td></tr><tr><td>Centroïde</td><td>centroid</td><td>centre de gravité</td><td>ST_Centroid</td></tr><tr><td>Point sur surface</td><td>point on surface</td><td>point garanti à l&#x27;intérieur</td><td>ST_PointOnSurface</td></tr><tr><td>Emprise</td><td>bounding box / extent</td><td>rectangle englobant</td><td>ST_Envelope, ST_Extent</td></tr><tr><td>Zone tampon</td><td>buffer</td><td>bande à distance fixe</td><td>ST_Buffer</td></tr><tr><td>Union / fusion</td><td>union / dissolve</td><td>réunir des formes</td><td>ST_Union</td></tr><tr><td>Validité</td><td>validity</td><td>respect des règles géométriques</td><td>ST_IsValid, ST_MakeValid</td></tr><tr><td>Jointure spatiale</td><td>spatial join</td><td>relier des tables par la géométrie</td><td>JOIN … ON ST_…</td></tr><tr><td>Index spatial</td><td>spatial index</td><td>accélère les recherches</td><td>USING GIST</td></tr></table></div>
+</section>
+</div>
+<script>window.addEventListener('beforeprint',()=>document.querySelectorAll('details').forEach(d=>d.open=true));</script>
+</body>
+</html>
