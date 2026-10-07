@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exercices PostGIS corrigés</title>
+<style>
+  :root{
+    --encre:#12355B;      /* bleu de plan */
+    --encre-clair:#E8EEF5;
+    --terrain:#2F6B4F;    /* vert topographique */
+    --terrain-clair:#E6F1EB;
+    --alerte:#B3261E;
+    --alerte-clair:#FBEAE8;
+    --jalon:#8A5A00;      /* ocre de jalon */
+    --jalon-clair:#FFF4D6;
+    --texte:#1B1F24;
+    --gris:#5B6570;
+    --trait:#C9D2DC;
+    --code-fond:#F4F6F8;
+  }
+  *{box-sizing:border-box}
+  html{font-size:16px}
+  body{
+    margin:0; background:#fff; color:var(--texte);
+    font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;
+    line-height:1.6;
+  }
+  .page{max-width:820px; margin:0 auto; padding:24px 28px 80px}
+  h1,h2,h3,h4{font-family:Georgia,"Times New Roman",serif; color:var(--encre); line-height:1.25}
+  h2{font-size:1.75rem; margin:0 0 .6em; padding-bottom:.35em; border-bottom:3px solid var(--encre)}
+  h3{font-size:1.2rem; margin:1.8em 0 .5em}
+  h4{font-size:1rem; margin:1.4em 0 .4em; color:var(--terrain)}
+  p{margin:.6em 0}
+  ul,ol{padding-left:1.4em}
+  li{margin:.25em 0}
+  a{color:var(--encre)}
+  code{font-family:Consolas,"Courier New",monospace; font-size:.9em; background:var(--code-fond); padding:.08em .3em; border-radius:3px}
+  pre{
+    background:var(--code-fond); border:1px solid var(--trait); border-left:4px solid var(--encre);
+    padding:12px 14px; margin:.9em 0; overflow-x:auto; border-radius:0 4px 4px 0;
+    font-family:Consolas,"Courier New",monospace; font-size:.82rem; line-height:1.5;
+    white-space:pre-wrap; word-break:break-word;
+  }
+  pre code{background:none; padding:0; font-size:inherit}
+  pre.shell{border-left-color:var(--terrain)}
+  .c{color:#6B7682; font-style:italic}       /* commentaire */
+  .k{color:#12355B; font-weight:700}          /* mot-clé */
+  .legende{font-size:.82rem; color:var(--gris); margin-top:-.4em}
+
+  /* Couverture */
+  .couverture{
+    min-height:92vh; display:flex; flex-direction:column; justify-content:space-between;
+    border:2px solid var(--encre); padding:40px 36px; margin-bottom:40px; position:relative;
+    background:
+      linear-gradient(var(--encre-clair) 1px, transparent 1px) 0 0/100% 28px,
+      linear-gradient(90deg, var(--encre-clair) 1px, transparent 1px) 0 0/28px 100%;
+  }
+  .couverture .bloc{background:#fff; padding:22px 24px; border:1px solid var(--encre)}
+  .couverture h1{font-size:2.5rem; margin:0 0 .3em}
+  .couverture .sous{font-size:1.15rem; color:var(--gris); margin:0}
+  .cartouche{display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--encre); background:#fff; font-size:.9rem}
+  .cartouche div{padding:8px 12px; border-bottom:1px solid var(--trait)}
+  .cartouche div:nth-child(odd){border-right:1px solid var(--trait)}
+  .cartouche b{display:block; color:var(--encre); font-size:.78rem; font-weight:600}
+
+  /* Chaîne de traitement */
+  .chaine{display:flex; flex-wrap:wrap; gap:6px; margin:1em 0; align-items:stretch}
+  .chaine .etape{flex:1 1 120px; border:1.5px solid var(--encre); padding:8px 10px; font-size:.82rem; background:#fff}
+  .chaine .etape b{display:block; color:var(--encre); font-size:.92rem}
+  .chaine .fl{align-self:center; color:var(--encre); font-weight:700}
+
+  /* Encadrés */
+  .note,.piege,.astuce,.retenir{padding:10px 14px; margin:1em 0; border-left:5px solid; font-size:.94rem}
+  .note{background:var(--encre-clair); border-color:var(--encre)}
+  .piege{background:var(--alerte-clair); border-color:var(--alerte)}
+  .astuce{background:var(--terrain-clair); border-color:var(--terrain)}
+  .retenir{background:var(--jalon-clair); border-color:var(--jalon)}
+  .note>b:first-child,.piege>b:first-child,.astuce>b:first-child,.retenir>b:first-child{display:block; margin-bottom:.2em}
+  .piege>b:first-child{color:var(--alerte)} .astuce>b:first-child{color:var(--terrain)}
+  .retenir>b:first-child{color:var(--jalon)} .note>b:first-child{color:var(--encre)}
+
+  table{border-collapse:collapse; width:100%; margin:1em 0; font-size:.88rem}
+  th,td{border:1px solid var(--trait); padding:6px 9px; text-align:left; vertical-align:top}
+  th{background:var(--encre); color:#fff; font-weight:600}
+  tr:nth-child(even) td{background:#FAFBFC}
+  .tablewrap{overflow-x:auto}
+
+  section.chapitre{margin-top:56px}
+  .num{font-family:Georgia,serif; color:var(--terrain); font-size:.95rem; font-weight:700; display:block; margin-bottom:.2em}
+  .duree{font-size:.85rem; color:var(--gris); margin:-.3em 0 1em}
+
+  .sommaire ol{list-style:none; padding:0; margin:0}
+  .sommaire li{display:flex; gap:10px; padding:6px 0; border-bottom:1px dotted var(--trait)}
+  .sommaire li span:first-child{color:var(--terrain); font-weight:700; min-width:2.2em}
+  .sommaire a{text-decoration:none; color:var(--texte)}
+  .sommaire a:hover{text-decoration:underline}
+
+  .exo{border:1.5px solid var(--terrain); padding:10px 14px; margin:1em 0}
+  .exo>b:first-child{color:var(--terrain)}
+
+  .barre{position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid var(--trait); padding:8px 28px; display:flex; justify-content:space-between; align-items:center; font-size:.88rem; gap:12px}
+  .barre button{background:var(--encre); color:#fff; border:0; padding:8px 14px; font-size:.88rem; cursor:pointer; border-radius:3px}
+  .barre button:focus-visible, a:focus-visible{outline:3px solid var(--jalon); outline-offset:2px}
+
+  /* ----------- Impression / PDF ----------- */
+  @page{size:A4; margin:18mm 16mm 18mm 16mm}
+  @media print{
+    html{font-size:11pt}
+    .barre{display:none}
+    .page{max-width:none; padding:0}
+    .couverture{min-height:250mm; page-break-after:always; margin:0}
+    .sommaire{page-break-after:always}
+    section.chapitre{page-break-before:always; margin-top:0}
+    pre,table,.note,.piege,.astuce,.retenir,.exo,.chaine{page-break-inside:avoid; break-inside:avoid}
+    h2,h3,h4{page-break-after:avoid; break-after:avoid}
+    pre{font-size:8.6pt}
+    a{text-decoration:none; color:inherit}
+    *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  }
+
+  details{margin:.6em 0 .2em}
+  details summary{cursor:pointer; color:var(--terrain); font-weight:600; font-size:.9rem}
+  table.resultat{width:auto; min-width:40%}
+  table.resultat td{font-family:Consolas,"Courier New",monospace; font-size:.82rem}
+  @media (max-width:600px){ .page{padding:16px 16px 60px} .barre{padding:8px 16px} .couverture{padding:20px 16px} .cartouche{grid-template-columns:1fr} .couverture h1{font-size:1.8rem} }
+  @media print{ details summary{display:none} .tablewrap{overflow:visible} }
+
+  .boutons{display:flex; gap:8px}
+  .reponse{display:none}
+  .corrige{margin-top:.8em; padding:8px 12px; background:var(--terrain-clair); border-left:4px solid var(--terrain)}
+  .corrige>b:first-child{color:var(--terrain); display:block}
+  .corrige pre{background:#fff}
+  body.sans-corrige .corrige{display:none}
+  body.sans-corrige .reponse{display:block; margin-top:.6em}
+  .reponse span{display:block; height:1.9em; border-bottom:1px dotted var(--gris)}
+  @media (max-width:600px){ .barre{flex-wrap:wrap} .boutons button{padding:6px 10px} }
+</style>
+
+</head>
+<body>
+
+<div class="barre">
+  <span>Exercices simples avec correction</span>
+  <span class="boutons">
+    <button id="bascule" onclick="basculer()">Masquer les corrections</button>
+    <button onclick="window.print()">Enregistrer en PDF</button>
+  </span>
+</div>
+<div class="page">
+<header class="couverture">
+  <div class="bloc">
+    <h1>Exercices simples avec correction</h1>
+    <p class="sous">Types de données, termes géospatiaux et premières fonctions ST_, sur le lotissement de Malicounda Est</p>
+  </div>
+  <div class="cartouche">
+    <div><b>Public</b>Débutants (Module 1 et module « termes géospatiaux » suivis)</div>
+    <div><b>Durée indicative</b>2 à 3 heures</div>
+    <div><b>Base</b><code>Malicounda_EST</code>, table <code>"malicouda est"</code> importée</div>
+    <div><b>Outil</b>pgAdmin 4 : Query Tool, touche F5</div>
+    <div><b>Organisation</b>7 séries, de la plus facile à la moins facile</div>
+    <div><b>Formateur</b>Cheikh NGOM</div>
+  </div>
+</header>
+
+<nav class="sommaire" aria-label="Sommaire">
+  <h2>Sommaire</h2>
+  <ol>
+    <li><span>1</span><a href="#s1">Le vocabulaire (sans ordinateur)</a></li>
+    <li><span>2</span><a href="#s2">Les types de données</a></li>
+    <li><span>3</span><a href="#s3">Ma première table</a></li>
+    <li><span>4</span><a href="#s4">Lire la table de Malicounda Est</a></li>
+    <li><span>5</span><a href="#s5">Les géométries simples</a></li>
+    <li><span>6</span><a href="#s6">Les fonctions ST_ sur les vrais lots</a></li>
+    <li><span>7</span><a href="#s7">Trouver l'erreur</a></li>
+  </ol>
+  <div class="note" style="margin-top:1.4em"><b>Deux versions dans un seul fichier</b><p>Le bouton <b>« Masquer les corrections »</b>, en haut de la page, cache toutes les corrections. Imprimer ensuite avec <b>« Enregistrer en PDF »</b> donne la <b>version étudiant</b>, avec des lignes pour répondre. Corrections affichées, on obtient la <b>version formateur</b>.</p></div>
+</nav>
+<section class="chapitre" id="s1"><span class="num">Série 1</span><h2>Le vocabulaire (sans ordinateur)</h2><p class="duree">Répondre sur la feuille · 20 min</p><div class="exo"><b>Exercice 1.</b> Relier chaque mot à sa définition.<div class="tablewrap"><table class="resultat"><tr><th>Mot</th><th></th><th>Définition</th></tr><tr><td>1. Entité</td><td></td><td>a. Le numéro qui identifie un système de coordonnées</td></tr><tr><td>2. Attribut</td><td></td><td>b. Un objet du monde réel, par exemple un lot</td></tr><tr><td>3. Géométrie</td><td></td><td>c. Une information sur l&#x27;objet, rangée dans une colonne</td></tr><tr><td>4. SRID</td><td></td><td>d. La forme et la position de l&#x27;objet</td></tr><tr><td>5. Sommet</td><td></td><td>e. Un point du contour d&#x27;un polygone</td></tr></table></div>
+<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><p><b>1-b · 2-c · 3-d · 4-a · 5-e</b></p></div></div>
+<div class="exo"><b>Exercice 2.</b> Pour chaque objet de Malicounda Est, quel type de géométrie utiliser : POINT, LINESTRING ou POLYGON ?<br>a) un lot · b) une borne · c) l'axe d'une rue · d) la limite commune entre deux lots · e) le centre d'un lot<div class="reponse"><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><p>a) POLYGON · b) POINT · c) LINESTRING · d) LINESTRING · e) POINT</p></div></div>
+<div class="exo"><b>Exercice 3.</b> Vrai ou faux ?<br>a) Le SRID 4326 donne des coordonnées en mètres.<br>b) Malicounda Est est dans la zone UTM 28 Nord.<br>c) Le dernier point d'un polygone doit être le même que le premier.<br>d) Deux lots qui se touchent par le bord se chevauchent.<br>e) <code>ST_Area</code> donne une surface en m² quand le SRID est 32628.<div class="reponse"><span></span><span></span><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><p>a) <b>Faux</b> : 4326 = degrés (GPS). C'est 32628 qui est en mètres.<br>b) <b>Vrai</b>.<br>c) <b>Vrai</b> : le contour doit être fermé.<br>d) <b>Faux</b> : ils se touchent (<code>ST_Touches</code>), ils ne se recouvrent pas.<br>e) <b>Vrai</b>.</p></div></div>
+<div class="exo"><b>Exercice 4.</b> Quel mot correspond à chaque phrase ?<br>a) « La bande de 6 m le long d'une voie. »<br>b) « Le rectangle qui englobe tout le lotissement. »<br>c) « Le point d'équilibre au centre d'un lot. »<br>d) « La partie commune à deux formes. »<div class="reponse"><span></span><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><p>a) zone tampon (<code>ST_Buffer</code>) · b) emprise (<code>ST_Extent</code>) · c) centroïde (<code>ST_Centroid</code>) · d) intersection (<code>ST_Intersection</code>)</p></div></div>
+</section><section class="chapitre" id="s2"><span class="num">Série 2</span><h2>Les types de données</h2><p class="duree">Dans pgAdmin · 20 min</p><div class="note"><b>Rappel</b><p>INTEGER (entier), NUMERIC (nombre à virgule, avec un point), VARCHAR (texte entre guillemets simples), DATE ('AAAA-MM-JJ'), BOOLEAN (TRUE / FALSE).</p></div>
+<div class="exo"><b>Exercice 5.</b> Afficher le texte <code>Malicounda Est</code> dans une colonne nommée <code>lotissement</code>.<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> 'Malicounda Est' <span class="k">AS</span> lotissement;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>lotissement</th></tr><tr><td>Malicounda Est</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 6.</b> Calculer la surface d'un lot de 20 m sur 15 m.<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> 20 * 15 <span class="k">AS</span> surface_m2;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>surface_m2</th></tr><tr><td>300</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 7.</b> Calculer <code>9 / 2</code> puis <code>9.0 / 2</code>. Pourquoi les résultats sont-ils différents ?<div class="reponse"><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> 9 / 2 <span class="k">AS</span> a, 9.0 / 2 <span class="k">AS</span> b;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>a</th><th>b</th></tr><tr><td>4</td><td>4.5</td></tr></table></div>
+<p>Entre deux entiers, la division est <b>entière</b> : 9 / 2 = 4. Avec <code>9.0</code>, le calcul est décimal : 4,5.</p></div></div>
+<div class="exo"><b>Exercice 8.</b> La table compte 3 120 lots, dont 2 340 ont un propriétaire. Calculer en SQL le nombre de lots sans propriétaire.<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> 3120 - 2340 <span class="k">AS</span> lots_sans_proprietaire;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>lots_sans_proprietaire</th></tr><tr><td>780</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 9.</b> Quel type choisir pour chaque information ?<br>a) le numéro de lot <code>LOT 11 K</code> · b) une superficie de 296,5 m² · c) la date d'attribution · d) « le lot est-il attribué ? » · e) le nombre de lots d'un îlot<div class="reponse"><span></span><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><p>a) VARCHAR (il contient des lettres) · b) NUMERIC · c) DATE · d) BOOLEAN · e) INTEGER</p><p>On peut vérifier avec <code>pg_typeof</code> :</p><pre><code><span class="k">SELECT</span> pg_typeof(DATE '2026-10-07'), pg_typeof(296.5), pg_typeof(FALSE);</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>pg_typeof</th><th>pg_typeof</th><th>pg_typeof</th></tr><tr><td>date</td><td>numeric</td><td>boolean</td></tr></table></div>
+</div></div>
+</section><section class="chapitre" id="s3"><span class="num">Série 3</span><h2>Ma première table</h2><p class="duree">Dans pgAdmin · 25 min</p><div class="exo"><b>Exercice 10.</b> Créer une table <code>bornes</code> avec les colonnes : <code>id</code> (entier), <code>nom</code> (texte de 10 caractères), <code>x</code> et <code>y</code> (nombres à 2 décimales), <code>posee</code> (vrai/faux).<div class="reponse"><span></span><span></span><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">CREATE TABLE</span> bornes (
+    id     <span class="k">INTEGER</span>,
+    nom    <span class="k">VARCHAR</span>(10),
+    x      <span class="k">NUMERIC</span>(10,2),
+    y      <span class="k">NUMERIC</span>(10,2),
+    posee  BOOLEAN
+);</code></pre>
+</div></div>
+<div class="exo"><b>Exercice 11.</b> Ajouter ces trois bornes, puis afficher toute la table.<div class="tablewrap"><table class="resultat"><tr><th>id</th><th>nom</th><th>x</th><th>y</th><th>posee</th></tr><tr><td>1</td><td>B1</td><td>288934.90</td><td>1598249.06</td><td>oui</td></tr><tr><td>2</td><td>B2</td><td>288956.58</td><td>1598261.50</td><td>oui</td></tr><tr><td>3</td><td>B3</td><td>288954.75</td><td>1598246.61</td><td>non</td></tr></table></div>
+<div class="reponse"><span></span><span></span><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">INSERT INTO</span> bornes <span class="k">VALUES</span>
+    (1, 'B1', 288934.90, 1598249.06, TRUE),
+    (2, 'B2', 288956.58, 1598261.50, TRUE),
+    (3, 'B3', 288954.75, 1598246.61, FALSE);
+
+<span class="k">SELECT</span> * <span class="k">FROM</span> bornes;</code></pre>
+<p>Le message <code>INSERT 0 3</code> confirme l'ajout des 3 lignes.</p></div></div>
+<div class="exo"><b>Exercice 12.</b> Afficher le nom des bornes qui ne sont <b>pas encore posées</b>.<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> nom <span class="k">FROM</span> bornes <span class="k">WHERE</span> posee = FALSE;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>nom</th></tr><tr><td>B3</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 13.</b> Un étudiant tape la ligne ci-dessous et obtient une erreur. Pourquoi ? Corriger.<pre><code><span class="k">INSERT INTO</span> bornes <span class="k">VALUES</span> (4, 'B4', '288936,73', 1598263.94, TRUE);</code></pre>
+<div class="reponse"><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><p>Erreur : <code>invalid input syntax for type numeric: "288936,73"</code>. En SQL, les décimales s'écrivent avec un <b>point</b>, et un nombre ne se met pas entre guillemets.</p><pre><code><span class="k">INSERT INTO</span> bornes <span class="k">VALUES</span> (4, 'B4', 288936.73, 1598263.94, TRUE);</code></pre>
+</div></div>
+</section><section class="chapitre" id="s4"><span class="num">Série 4</span><h2>Lire la table de Malicounda Est</h2><p class="duree">Dans pgAdmin · 30 min</p><div class="note"><b>Rappel</b><p>Le nom de la table et de la colonne <code>"n° du lot"</code> s'écrivent entre <b>guillemets doubles</b> ; les valeurs de texte (<code>'3710'</code>) entre <b>guillemets simples</b>. Pour tester une valeur absente : <code>IS NULL</code>.</p></div>
+<div class="exo"><b>Exercice 14.</b> Combien de lots compte la table ?<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est";</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>count</th></tr><tr><td>3120</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 15.</b> Combien de lots font exactement 300 m² ?<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> superficie = 300;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>count</th></tr><tr><td>1311</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 16.</b> Afficher l'identifiant (<code>ogc_fid</code>) et la superficie du lot n° 3708.<div class="reponse"><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> ogc_fid, superficie
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> "n° du lot" = '3708';</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>ogc_fid</th><th>superficie</th></tr><tr><td>7</td><td>300</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 17.</b> Combien de lots font moins de 100 m² ?<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> superficie &lt; 100;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>count</th></tr><tr><td>77</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 18.</b> Combien de lots <b>ont</b> un numéro ?<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" <span class="k">IS</span> <span class="k">NOT</span> <span class="k">NULL</span>;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>count</th></tr><tr><td>2863</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 19.</b> Combien de lots ont un numéro qui commence par <code>LOT</code> (ancienne numérotation) ?<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" <span class="k">LIKE</span> 'LOT%';</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>count</th></tr><tr><td>330</td></tr></table></div>
+<p><code>%</code> remplace n'importe quelle suite de caractères.</p></div></div>
+<div class="exo"><b>Exercice 20.</b> Quelle est la plus grande et la plus petite superficie ?<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> MAX(superficie), MIN(superficie) <span class="k">FROM</span> "malicouda est";</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>max</th><th>min</th></tr><tr><td>18543</td><td>0</td></tr></table></div>
+<p>Une superficie de 0 m² signale des débris de dessin (polygones parasites).</p></div></div>
+<div class="exo"><b>Exercice 21.</b> Combien de lots ont une superficie comprise entre 250 et 350 m² (bornes comprises) ?<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> superficie <span class="k">BETWEEN</span> 250 <span class="k">AND</span> 350;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>count</th></tr><tr><td>2793</td></tr></table></div>
+</div></div>
+</section><section class="chapitre" id="s5"><span class="num">Série 5</span><h2>Les géométries simples</h2><p class="duree">Dans pgAdmin · 25 min</p><div class="note"><b>Rappel</b><p><code>ST_GeomFromText('POINT(x y)', srid)</code> fabrique une géométrie. Sans SRID, les exemples sont dans un repère simple en mètres. Un polygone se ferme en répétant le premier point.</p></div>
+<div class="exo"><b>Exercice 22.</b> Fabriquer le point de coordonnées X = 288950, Y = 1598260 en SRID 32628, et l'afficher en texte.<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> ST_AsText( ST_GeomFromText('POINT(288950 1598260)', 32628) );</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>st_astext</th></tr><tr><td>POINT(288950 1598260)</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 23.</b> Un terrain rectangulaire mesure 20 m sur 25 m. Écrire son polygone (coin en 0 0), puis calculer sa surface et son périmètre.<div class="reponse"><span></span><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> ST_Area(     ST_GeomFromText('POLYGON((0 0, 20 0, 20 25, 0 25, 0 0))')) <span class="k">AS</span> surface,
+       ST_Perimeter(ST_GeomFromText('POLYGON((0 0, 20 0, 20 25, 0 25, 0 0))')) <span class="k">AS</span> perimetre;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>surface</th><th>perimetre</th></tr><tr><td>500</td><td>90</td></tr></table></div>
+<p>20 × 25 = 500 m² ; 2 × (20 + 25) = 90 m.</p></div></div>
+<div class="exo"><b>Exercice 24.</b> Quelle est la longueur de la ligne qui va du point (0 0) au point (30 40) ? Quel est son type ?<div class="reponse"><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> ST_Length(ST_GeomFromText('LINESTRING(0 0, 30 40)'))  <span class="k">AS</span> longueur,
+       GeometryType(ST_GeomFromText('LINESTRING(0 0, 30 40)')) <span class="k">AS</span> type;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>longueur</th><th>type</th></tr><tr><td>50</td><td>LINESTRING</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 25.</b> Trouver le centre (centroïde) du terrain de 20 m × 25 m.<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> ST_AsText( ST_Centroid( ST_GeomFromText('POLYGON((0 0, 20 0, 20 25, 0 25, 0 0))') ) );</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>st_astext</th></tr><tr><td>POINT(10 12.5)</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 26.</b> Le point (5 5) est-il dans le terrain de 20 m × 25 m ? Et le point (50 5) ?<div class="reponse"><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> ST_Contains(ST_GeomFromText('POLYGON((0 0, 20 0, 20 25, 0 25, 0 0))'),
+                   ST_GeomFromText('POINT(5 5)'))  <span class="k">AS</span> point_5_5,
+       ST_Contains(ST_GeomFromText('POLYGON((0 0, 20 0, 20 25, 0 25, 0 0))'),
+                   ST_GeomFromText('POINT(50 5)')) <span class="k">AS</span> point_50_5;</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>point_5_5</th><th>point_50_5</th></tr><tr><td>true</td><td>false</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 27.</b> Convertir le point X = 288950, Y = 1598260 (SRID 32628) en coordonnées GPS (SRID 4326).<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> ST_AsText( ST_Transform( ST_GeomFromText('POINT(288950 1598260)', 32628), 4326) );</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>st_astext</th></tr><tr><td>POINT(-16.957857 14.448780)</td></tr></table></div>
+<p>Longitude -16,9579, latitude 14,4488 : on est à Malicounda Est.</p></div></div>
+</section><section class="chapitre" id="s6"><span class="num">Série 6</span><h2>Les fonctions ST_ sur les vrais lots</h2><p class="duree">Dans pgAdmin · 30 min</p><div class="note"><b>Rappel</b><p>La colonne géométrique de la table s'appelle <code>wkb_geometry</code>. Pour comparer deux lots, on cite la table deux fois avec deux surnoms : <code>FROM "malicouda est" a, "malicouda est" b</code>.</p></div>
+<div class="exo"><b>Exercice 28.</b> Pour le lot 3708 : afficher le type de géométrie, le SRID, la surface et le périmètre (arrondis).<div class="reponse"><span></span><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> GeometryType(wkb_geometry)        <span class="k">AS</span> type,
+       ST_SRID(wkb_geometry)             <span class="k">AS</span> srid,
+       ROUND(ST_Area(wkb_geometry))      <span class="k">AS</span> surface,
+       ROUND(ST_Perimeter(wkb_geometry)) <span class="k">AS</span> perimetre
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> "n° du lot" = '3708';</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>type</th><th>srid</th><th>surface</th><th>perimetre</th></tr><tr><td>MULTIPOLYGON</td><td>32628</td><td>300</td><td>70</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 29.</b> Les lots 3708 et 3709 se touchent-ils ? Quelle distance les sépare ?<div class="reponse"><span></span><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> ST_Touches (a.wkb_geometry, b.wkb_geometry) <span class="k">AS</span> se_touchent,
+       ST_Distance(a.wkb_geometry, b.wkb_geometry) <span class="k">AS</span> distance
+<span class="k">FROM</span> "malicouda est" a, "malicouda est" b
+<span class="k">WHERE</span> a."n° du lot" = '3708' <span class="k">AND</span> b."n° du lot" = '3709';</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>se_touchent</th><th>distance</th></tr><tr><td>true</td><td>0</td></tr></table></div>
+<p>Ils sont voisins : distance 0.</p></div></div>
+<div class="exo"><b>Exercice 30.</b> Même question pour les lots 3708 et 2944.<div class="reponse"><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> ST_Touches(a.wkb_geometry, b.wkb_geometry) <span class="k">AS</span> se_touchent,
+       ROUND(ST_Distance(a.wkb_geometry, b.wkb_geometry)::numeric, 1) <span class="k">AS</span> distance_m
+<span class="k">FROM</span> "malicouda est" a, "malicouda est" b
+<span class="k">WHERE</span> a."n° du lot" = '3708' <span class="k">AND</span> b."n° du lot" = '2944';</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>se_touchent</th><th>distance_m</th></tr><tr><td>false</td><td>273.8</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 31.</b> Donner les coordonnées GPS du centre du lot 3708.<div class="reponse"><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> ST_AsText( ST_Transform( ST_Centroid(wkb_geometry), 4326) )
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> "n° du lot" = '3708';</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>st_astext</th></tr><tr><td>POINT(-16.957881 14.448871)</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 32.</b> Dans quel lot se trouve le point X = 288950, Y = 1598260 (SRID 32628) ?<div class="reponse"><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> "n° du lot"
+<span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> ST_Contains(wkb_geometry, ST_GeomFromText('POINT(288950 1598260)', 32628));</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>n° du lot</th></tr><tr><td>3710</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 33.</b> Combien de lots ont une géométrie invalide ?<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> <span class="k">NOT</span> ST_IsValid(wkb_geometry);</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>count</th></tr><tr><td>0</td></tr></table></div>
+<p>Aucun : le nettoyage dans QGIS a été bien fait.</p></div></div>
+</section><section class="chapitre" id="s7"><span class="num">Série 7</span><h2>Trouver l'erreur</h2><p class="duree">Sur papier, puis vérifier dans pgAdmin · 20 min</p><div class="exo"><b>Exercice 34.</b> Cette requête renvoie une erreur. Pourquoi ? Corriger.<pre><code><span class="k">SELECT</span> superficie <span class="k">FROM</span> malicouda est;</code></pre>
+<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><p>Erreur : <code>relation "malicouda" does not exist</code>. Le nom contient un espace : il faut des guillemets doubles.</p><pre><code><span class="k">SELECT</span> superficie <span class="k">FROM</span> "malicouda est";</code></pre>
+</div></div>
+<div class="exo"><b>Exercice 35.</b> Cette requête renvoie une erreur. Pourquoi ? Corriger.<pre><code><span class="k">SELECT</span> * <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" = "3710";</code></pre>
+<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><p>Erreur : <code>column "3710" does not exist</code>. Entre guillemets doubles, PostgreSQL croit que 3710 est un nom de colonne. Une valeur s'écrit entre guillemets simples.</p><pre><code><span class="k">SELECT</span> * <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" = '3710';</code></pre>
+</div></div>
+<div class="exo"><b>Exercice 36.</b> Cette requête répond 0. Pourtant, 257 lots n'ont pas de numéro. Pourquoi ? Corriger.<pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" = <span class="k">NULL</span>;</code></pre>
+<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><p><code>NULL</code> veut dire « inconnu » : rien n'est jamais « égal » à une valeur inconnue. On écrit <code>IS NULL</code>.</p><pre><code><span class="k">SELECT</span> COUNT(*) <span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" <span class="k">IS</span> <span class="k">NULL</span>;   <span class="c">-- 257</span></code></pre>
+</div></div>
+<div class="exo"><b>Exercice 37.</b> Ce polygone est refusé. Pourquoi ? Corriger.<pre><code><span class="k">SELECT</span> ST_GeomFromText('POLYGON((0 0, 20 0, 20 25, 0 25))');</code></pre>
+<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><p>Erreur : <code>geometry contains non-closed rings</code>. Le contour n'est pas fermé : il faut répéter le premier point à la fin.</p><pre><code><span class="k">SELECT</span> ST_GeomFromText('POLYGON((0 0, 20 0, 20 25, 0 25, 0 0))');</code></pre>
+</div></div>
+<div class="exo"><b>Exercice 38.</b> Pour retrouver le lot d'un point GPS (latitude 14,4487, longitude -16,9579), un étudiant écrit la requête ci-dessous. Elle ne trouve aucun lot. Pourquoi ? Corriger.<pre><code><span class="k">SELECT</span> "n° du lot" <span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> ST_Contains(wkb_geometry,
+      ST_Transform(ST_SetSRID(ST_MakePoint(14.4487, -16.9579), 4326), 32628));</code></pre>
+<div class="reponse"><span></span><span></span><span></span></div><div class="corrige"><b>Correction</b><p><code>ST_MakePoint</code> attend <b>X puis Y</b>, donc <b>longitude puis latitude</b>. Ici les deux sont inversés : le point part dans le sud de l'Angola.</p><pre><code><span class="k">SELECT</span> "n° du lot" <span class="k">FROM</span> "malicouda est"
+<span class="k">WHERE</span> ST_Contains(wkb_geometry,
+      ST_Transform(ST_SetSRID(ST_MakePoint(-16.9579, 14.4487), 4326), 32628));</code></pre>
+<div class="tablewrap"><table class="resultat"><tr><th>n° du lot</th></tr><tr><td>3710</td></tr></table></div>
+</div></div>
+<div class="exo"><b>Exercice 39.</b> Un étudiant veut la surface du lot 3710 et obtient <code>0.000000025</code>. Pourquoi ? Corriger.<pre><code><span class="k">SELECT</span> ST_Area( ST_Transform(wkb_geometry, 4326) )
+<span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" = '3710';</code></pre>
+<div class="reponse"><span></span><span></span></div><div class="corrige"><b>Correction</b><p>En SRID 4326, les coordonnées sont en <b>degrés</b> : la surface sort en « degrés carrés », sans signification. On mesure dans le SRID d'origine, 32628, en mètres.</p><pre><code><span class="k">SELECT</span> ST_Area(wkb_geometry)
+<span class="k">FROM</span> "malicouda est" <span class="k">WHERE</span> "n° du lot" = '3710';      <span class="c">-- 300</span></code></pre>
+</div></div>
+</section>
+</div>
+<script>
+function basculer(){
+  const off = document.body.classList.toggle('sans-corrige');
+  document.getElementById('bascule').textContent = off ? 'Afficher les corrections' : 'Masquer les corrections';
+}
+if (location.hash === '#etudiant') basculer();
+</script>
+</body>
+</html>
